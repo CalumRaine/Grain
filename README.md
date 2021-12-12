@@ -6,17 +6,20 @@
     <tr>
       <td>Roger</td>
       <td>Clarke</td>
-      <td>01/07/86 - 15:14</td>
+      <td>01/07/86</td>
+      <td>stamp_15:14</td>
     </tr>
     <tr>
       <td>Arnold</td>
       <td>Webber</td>
-      <td>09/05/93 - 12:02</td>
+      <td>09/05/93</td>
+      <td>stamp_12:02</td>
     </tr>
     <tr>
       <td>Jason</td>
       <td>Marshall</td>
-      <td>03/12/75 - 21:33</td>
+      <td>03/12/75</td>
+      <td>stamp_21:33</td>
     </tr>
   </tbody>
 </table>
@@ -31,13 +34,13 @@
 file = "my_file.txt"
 def line("\n")
 def column
-def time("-")
-def hour(":")[0]
+def time("_")
+def hour(":")
 
 for line in file
-  select column[2]
+  select column[3]
     select time[1]
-      select hour
+      select hour[0]
         hour = hour + 1
   print line
 ```
@@ -46,16 +49,17 @@ Or, more succinctly:
 
 ```
 def line("\n")
+def lastColumn()[-1]
 def time("-")[1]
 def hour(":")[0]
 
 for line in "my_file.txt"
-  select hour from time from line
+  select hour from time from lastColumn from line
     hour = hour + 1
-  print line
+  print hour 
 ```
 
-However, you don't need to use lines.  As stated, the file itself is the root record.  Here you could print everything that occurs between brackets in a file:
+However, you don't need to use lines.  As stated, the file itself is the root segment.  Here you could print everything that occurs between brackets in a file:
 
 ```
 def openBracket("(")
@@ -64,21 +68,33 @@ def closeBracket(")")[0]
 for openBracket in "my_file.txt"
   for closeBracket in openBracket
     print closeBracket
-``
+```
 
-## Defining Separators
+## Defining Separators `def name(separator)[index]`
 
-1. `def field` defines a separator called `field`.  No separator is specified so whitespace is used by default
-2. `def field(",") defines a comma separator called `field`
-3. `def hours(":")[0] defines a separator called `hours` that will extract everything preceding the first colon 
-4. `def year("/")[2] defines a separator called `year` that will extract everything between the 2nd and 3rd slash
-5. `def letter()` or `def letter("")` defines an empty separator called `letter` that would treat characters individually 
+* Minimal required syntax is `def name` or `def name()`, which uses whitespace as the default `separator`
+* `separator` is a string of one or more characters that defines the delimiter
+* An empty `separator`, such as `def name("")` will treat each character individually 
+* An index can be defined to automatically isolate a particular occurence 
+* An index can be a lambda expression instead of just a number
 
-## Iterator
+#### Examples
 
-`for x in y`
+input.txt = "the fat, black cat liked: milk, cheese and grapes"
+
+* `def column` or `def column()` --> _(see Iterator example)_
+* `def field(",") --> _(see Iterator example)_
+* `def sep("and ")[1] --> "grapes"
+* `def sep("")`[i => i%2==0] --> "h", "f", "t", "l", "c" ...
+
+
+## Iterator `for x in y`
 
 * Breaks `y` into segments of `x` and iterates through them
+
+#### Examples
+* `for column in "input.txt"` --> "the " "fat, " "black " "cat " "liked: " "milk, " "cheese " "and " "grapes"
+* `for field in "input.txt" --> "the fat," " black cat liked: milk," " cheese and grapes"
  
 
 ## Extractor
