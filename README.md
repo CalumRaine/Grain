@@ -42,18 +42,6 @@ Kevin 1972
 Laura 2001
 ```
 
-#### Alternative Syntax
-```
-file testFile = "my_file.txt"
-sep line("\n")
-sep column
-sep year("/")[0]
-
-scan line                           # omit parent because only one file declared so context is inferred 
-  print column[1] " "
-  print year "\n" from column[4]    # omit select statement because parent is directly specified 
-```
-
 ## `sep name("delimiter")[index]`
 
 * Defines a new separator
@@ -77,16 +65,16 @@ scan line                           # omit parent because only one file declared
     * `sep date("/")[date != 1]` breaks `"01/03/1994"` into `"01" "1994"`
 
 
-
-
 ## `select <child> from <parent>`
-* `child` should be a previously defined separator
-* parent can be inferred from context if `from <parent>` is omitted
+* Switches parent context for subsequent code block
+* Code block must be terminated with `deselect` to revert context back to previous parent
+* `child` is a previously defined separator
+* `parent` can be inferred from context if `from <parent>` is omitted
 * Examples:
   * `select line from file`
   * `select column from line`
-  * `select line from file; select column`
- 
+  * `select line from file; select column; print year; deselect`
+
 
 
 ## Syntax Decisions
