@@ -1,8 +1,12 @@
 Only two ways to split a string
 
 Up to next --> Up to next --> Up to next
+
 OR
+
 Between x and y
+
+Switch parent contexts
 
 ## Benefits of `Grain` over existing file parsers
 * Multiple field delimiters are allowed
