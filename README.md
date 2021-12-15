@@ -1,17 +1,6 @@
-Only two ways to split a string
-
-Up to next --> Up to next --> Up to next
-
-OR
-
-Between x and y
-
-Switch parent contexts
-
 ## Benefits of `Grain` over existing file parsers
-* Multiple field delimiters are allowed
-* Multiple files are allowed
-* The purpose-oriented syntax is simple
+* Multiple field delimiters
+* Multiple files
 
 ## Concepts
 File parsing is about parent and child relationships.
@@ -40,10 +29,8 @@ sep line("\n")
 sep column
 sep year("/")[0]
 
-select line from testFile
-  print column[1] " "
-  select column[4]
-    print year "\n"
+scan testFile.line
+  print column[1] " " column[4].year
 ```
 
 ### Output
