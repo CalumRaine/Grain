@@ -76,27 +76,29 @@ Laura 2001
   * `select line from file; select column; print year; deselect`
 
 
-## Programming
+## Syntax Rules
+* Semicolon terminates statements
+* Multiple `var` / `sep` declarations can be strung together with a comma
 
+## Programming
 * Begin reading file
 * If `sep ` followed by whitespace, user is declaring a new separator
     * Syntax:
         * `sep column("_")`
         * `sep column()`
         * `sep year("/")[0]`
+        * `sep line("\n"), column(), date("/"), year("/")[0]`
     * Read alphanumeric characters until open brackets
     * Save contents of brackets as delimiter 
     * If square brackets, save index
-    * Else hit end of line 
+    * Else hit comma or semicolon 
     * Questions:
-        * Should you be allowed to declare multiple with a comma? `sep line("\n"), column(), date("/"), year("/")[0]`
-        * Do we use `;` semicolon terminators or just newlines to terminate statements?
         * Should you be allowed to use lambdas and `awk`-style expressions in the index? 
             * `sep col(i => i%2==0)` - extracts `col`s with an even index
             * `sep col( col%2==0 )` - extracts `col`s that are numerical _and_ even
             * `sep col( col~"name:" )` - extracts `col`s that include the text `name:`
         * What if a user defines `sep` in a loop?
-            * Stop the code from parsing the `sep` declaration each time.  You must track whether you have already entered this loop before or not.
+            * Stop the code from parsing the `sep` declaration each time.  You must detect whether you have already entered this loop and ignore.
         * Are `sep`s defined within scope or chronologically?  Should it use the recent definition or only the definition in this block?
     * Separator `struct` in code:
         * `name`
@@ -107,11 +109,12 @@ Laura 2001
         * `file testFile = "my_file.txt"`
         * `file testFile = $1`
         * `var filename = "my_file.txt"; file testFile = filename`
-    * Read alphanumeric characters until whitespace
+    * Read alphanumeric characters until whitespace or equals
     * Ignore equals and subsequent whitespace 
     * If double quotes, user is providing a string filename.  Save characters until closing double quotes then scan to newline.
     * If dollar sign, user is providing a command line argument
     * If alphanumeric characters, user is providing a variable name.  Throw error if variable doesn't exist.
+    * Continue reading until whitespace, comma or semicolon
     * Questions:
         * Is the equals necessary?  It could just be `file <var name> <filepath>`.
     * Code:
@@ -131,8 +134,9 @@ Laura 2001
     * If number ...
     * If double quotes ...
     * If alphanumeric then user is assigning the value of an existing variable.  Throw error if variable does not exist.
+    * Beware that (in the case of string concatenation) the user might add more than one item: `var combined = variableOne " " variableTwo`
     * Variables do not have data types.  Data types are inferred upon usage.  Mathematical operators can only be used on numbers, otherwise treated as text.  Do _not_ use `+` as a string concatenator - I hate it. 
     * Questions:
-        * Again, is the equals necessary? `var test "hello"` would be fine, this is how command line arguments such as `grep` work.  The assignment operator is just tradition?
-        * Is the `var` mandatory?  Many scripting languages (`awk`, `python` and `JavaScript`) will 
+        * Again, is the equals necessary? `var test "hello"` would be fine, this is how command line arguments such as `grep` work.
+        * Is the `var` mandatory?  Many scripting languages (`awk`, `python` and `JavaScript`) will assert unrecognised words as new variables.
          
