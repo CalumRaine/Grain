@@ -36,7 +36,7 @@ Laura A
 ## Syntax Rules
 * Semicolon terminates statements.
 * Multiple `var`/`sep` declarations can be strung together with a comma.
-* Variables are loosely typed.  Data type is inferred from usage.  Mathematical operators only used on numbers.
+* Variables are loosely typed.  Data type is inferred from usage.  Stored as string.  Temporarily converted to number if mathematical operator used.
 * Do not use `+` symbol for string concatenation, just use adjacent variable names or double-quoted strings.
 
 ## Programming
