@@ -56,6 +56,7 @@ Laura A
             * `sep col(i => i%2==0)` - extracts `col`s with an even index
             * `sep col( col%2==0 )` - extracts `col`s that are numerical _and_ even
             * `sep col( col~"name:" )` - extracts `col`s that include the text `name:`
+        * Do we need a reserved word for when referring to column index instead of column content?  i.e. `i` used above
         * What if a user defines `sep` in a loop?
             * Stop the code from parsing the `sep` declaration each time.  You must detect whether you have already entered this loop and ignore.
         * Are `sep`s defined within scope or chronologically?  Should it use the recent definition or only the definition in this block?
