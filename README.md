@@ -19,9 +19,9 @@ sep component("-");
 
 loop testFile.line
   print column[1] " " column[2]>initial"\n"
-  switch column[4]
+  root column[4]
     print "\t" <column[3] " year="component[0] " month=" component[1] " day=" component[2]"\n"
-    switch <
+    root <
   print column[2]
 ```
 
