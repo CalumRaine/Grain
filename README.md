@@ -84,10 +84,10 @@ Laura 2001
 * Begin reading file
 * If `sep ` followed by whitespace, user is declaring a new separator
     * Syntax:
-        * `sep column("_")`
-        * `sep column()`
-        * `sep year("/")[0]`
-        * `sep line("\n"), column(), date("/"), year("/")[0]`
+        * `sep column("_");`
+        * `sep column();`
+        * `sep year("/")[0];`
+        * `sep line("\n"), column(), date("/"), year("/")[0];`
     * Read alphanumeric characters until open brackets
     * Save contents of brackets as delimiter 
     * If square brackets, save index
@@ -106,9 +106,9 @@ Laura 2001
         * `index`
 * If `file ` followed by whitespace, user is opening a file
     * Syntax:
-        * `file testFile = "my_file.txt"`
-        * `file testFile = $1`
-        * `var filename = "my_file.txt"; file testFile = filename`
+        * `file testFile = "my_file.txt";`
+        * `file testFile = $1;`
+        * `var filename = "my_file.txt"; file testFile = filename;`
     * Read alphanumeric characters until whitespace or equals
     * Ignore equals and subsequent whitespace 
     * If double quotes, user is providing a string filename.  Save characters until closing double quotes then scan to newline.
@@ -122,10 +122,10 @@ Laura 2001
       * If the user reuses the variable name to open a new file, just remember to close the old one first or you'll leak it.
 * If `var ` followed by whitespace, user is declaring a variable
     * Syntax:
-        * `var test = "hello"`
-        * `var myVariable = 12`
-        * `var secondVariable = otherVariable`
-        * `var test = "hello", myVariable = 12, anotherVar = otherVariable`
+        * `var test = "hello";`
+        * `var myVariable = 12;`
+        * `var secondVariable = otherVariable;`
+        * `var test = "hello", myVariable = 12, anotherVar = otherVariable;`
     * Read alphanumeric characters until either whitespace or equals
     * Only hyphens or underscores allowed in variable names
     * Variable name cannot only be numerical (most other languages do not allow first character to be a number, I don't think that's necessary, though is bad practice)
