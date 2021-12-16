@@ -20,7 +20,7 @@ sep component("-");
 loop testFile.line
   print column[1] " " column[2]>initial "\n"
   root column[4]
-    print "\t" <column[3] " year="component[0] " month=" component[1] " day=" component[2]"\n"
+    print "\t" <column[3] " year="component[0] " month="component[1] " day="component[2] "\n"
     root <
   print column[2]
 ```
