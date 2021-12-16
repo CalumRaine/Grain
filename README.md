@@ -17,13 +17,17 @@ file testFile = "my_file.txt";
 sep line("\n"), column(), initial("")[0];
 sep component("-");
 
-loop testFile.line
+scan testFile.line
   print column[1] " " column[2]>initial "\n"
-  root column[4]
+  switch column[4]
     print "\t" <column[3] " year=" component[0] " month=" component[1] " day=" component[2] "\n"
-    root <
+    switch <
   print column[2]
 ```
+
+`scan` -- all but the last level must be finite 
+print -- must be finite
+swtich -- must be finite
 
 ### Output
 ```
@@ -32,6 +36,61 @@ Kevin S
 Laura A
   dob: year=2001 month=04 day=17
 ```
+
+### Program:
+* `var [name] = ""` - save as string in name/string `struct` array (def 5), allocate default 100 chars. Variable names don't change so you can malloc specific.
+* `file [name] = "filename"` - save as name/filePointer in files `struct` array (def 5)
+* `[name] = "string"` assignment. Check vars then files (if file, close existing one first)
+* `print [item]` - only one item per `print`.  Provide double-quoted string or variable. 
+* `sep name("sep")[index]`
+* `scan`
+* `switch`
+* maths `+ - / % *` - only two items 
+* string concat - only two items 
+
+
+### Simplify This
+What are the absolute basic building blocks required for a user to carry out anything?
+* `if` `> < ==` (only latter is appropriate for strings)
+* `switch`
+  * Shifts parent context.
+* `scan a.b.c` 
+    * Will loop through all occurences of c in b in a
+    * `a` and `b` _must_ be indexed to a finite occurence, you cannot say "all dates in all columns in all lines", this requires multiple `scan` commands
+* `=` assignment
+* `print`
+
+
+## Context shifting: `switch a>b`
+* Shifts parent context
+```
+print line[0].column[3].year
+print line[0].column[3].month
+```
+is equivalent to 
+```
+switch line[0].column[3]
+    print year
+    print month
+    switch
+```
+* A `switch` statement on its own will revert back to the parent
+* Future:
+  * Use `>` and `<` instead of `.`
+  * Allow accessing parent variables with < arrow?
+
+## Looping: `scan a>b>c`
+* Will iterate through all occurences of `c` in `b` in `a`
+* `a` and `b` must be indexed to finite occurences, you cannot say "scan all dates in all columns in all lines" - this requires multiple `scan` commands
+
+## Comparators: `if x == y`
+* Conditional statements: `if` `else if` `else`
+* Operators: `<` `>` `==` (only the latter is appropriate for strings)
+* For now:
+    * Can only compare two things.  
+    * Nest multiple `if`.
+* Future:
+    * Allow && and ||
 
 ## Syntax Rules
 * Semicolon terminates statements.
@@ -52,7 +111,7 @@ Laura A
     * If square brackets, save index
     * Else hit comma or semicolon 
     * Questions:
-        * Should you be allowed to use lambdas and `awk`-style expressions in the index? 
+        * Should you be allowed to use lambdas and `awk`-style expressions in the index? - *No, not in version 1*
             * `sep col(i => i%2==0)` - extracts `col`s with an even index
             * `sep col( col%2==0 )` - extracts `col`s that are numerical _and_ even
             * `sep col( col~"name:" )` - extracts `col`s that include the text `name:`
