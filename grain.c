@@ -82,28 +82,28 @@ int parseVarDeclare(char *varName, struct varStruct *variables){
 
 void parsePrintString(char *scriptLine){
 	int start=findQuotes(scriptLine), pos=start;
-	for (int offset=0; scriptLine[pos + offset] != '"'; ++pos){
-		if (scriptLine[pos+offset] == '\') {
-			++offset;
-			scriptLine[pos] = parseEscapeSequence(scriptLine[pos+offset]);
-		}
-		else scriptLine[pos] = scriptLine[pos+offset];
-	}
+	for (  ; scriptLine[pos] != '"'; ++pos) if (scriptLine[pos] == '\') parseEscapeSequence(scriptLine, pos);
 	scriptLine[pos] = 0;
 	printf("%s", scriptLine[start]);
 }
 
-char parseEscapeSequence(char c){
-	switch (c){
+char parseEscapeSequence(char *scriptLine, int index){
+	switch (scriptLine[index+1]){
 		case 'n':
-			return '\n';
+			scriptLine[index] = '\n';
+			break;
 		case 't':
-			return '\t';
+			scriptLine[index] = '\t';
+			break;
 		case '\':
-			return '\';
+			scriptLine[index] = '\';
 		default:
-			fprintf(stderr, "Unrecognised escape sequence: \\%c\n", c), exit(1);
+			exit(fprintf(stderr, "Unrecognised escape sequence: \\%c\n", c));
 	}
+	
+	// Shuffle subsequent characters left
+	for (index = index+1; scriptLine[index] != '"' ; ) scriptLine[index] = scriptLine[index++];
+	scriptLine[index] = 0;
 }
 
 int findQuotes(char *scriptLine){
