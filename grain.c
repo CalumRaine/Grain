@@ -99,6 +99,8 @@ char parseEscapeSequence(char c){
 			return '\n';
 		case 't':
 			return '\t';
+		case '\':
+			return '\';
 		default:
 			fprintf(stderr, "Unrecognised escape sequence: \\%c\n", c), exit(1);
 	}
