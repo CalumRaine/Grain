@@ -15,7 +15,7 @@ struct varDict {
 
 struct varStruct {
 	int count;
-	struct *varDict dict;
+	struct varDict *dict;
 };
 
 struct tokenStruct {
@@ -26,9 +26,19 @@ struct tokenStruct {
 struct tokenStruct tokenise(char *line);
 void freeTokenStruct(struct tokenStruct tokens);
 int whitespace(char c);
-
+int parseVarDeclare(char *varName, struct varStruct *variables);
+void parsePrintString(char *scriptLine);
+char parseEscapeSequence(char *scriptLine, int index);
+int findQuotes(char *scriptLine);
+int varExists(char *varName, struct varStruct *variables);
+int varNameValid(char *varName);
+int varFirstCharValid(char c);
+int varCharValid(char c);
+int getStringLength(char *string);
+int stringEquals(char *a, char *b);
+struct tokenStruct tokenise(char *line);
 int main(char **argv){
-	struct varStruct variables = { .count = 0, .varDict = null };
+	struct varStruct variables = { .count = 0, .dict = NULL };
 
 	char scriptLine[100];
 	FILE *scriptFile = fopen(argv[1], "r");
@@ -51,9 +61,9 @@ int main(char **argv){
 			if (tokens.count != 2) return fprintf(stderr, "Expected variable name or string.  Error on line: %s", scriptLine);
 			else if (tokens.tokens[1][0]) parsePrintString(scriptLine);
 			else {
-				int varPos = varExists(tokens.tokens[1]);
+				int varPos = varExists(tokens.tokens[1], &variables);
 				if (varPos == -1) fprintf(stderr, "Variable \"%s\" does not exist\n", tokens.tokens[1]);
-				else printf("%s", variables.varDict[varPos].value);
+				else printf("%s", variables.dict[varPos].value);
 			}
 		}
 		freeTokenStruct(tokens);
@@ -64,14 +74,14 @@ int main(char **argv){
 
 int parseVarDeclare(char *varName, struct varStruct *variables){
 	if (!varNameValid(varName)) return 1;
-	else if (varExists(varName, varStruct *variables) == -1) return 2;
+	else if (varExists(varName, variables) == -1) return 2;
 
 	variables->dict = realloc(variables->dict, (variables->count + 1) * sizeof(struct varDict));
 
 	int varLength = getStringLength(varName);
 
 	variables->dict[variables->count].key = malloc( (varLength + 1) * sizeof(char) );
-	variables->dict[variables->count].value = null;
+	variables->dict[variables->count].value = NULL;
 
 	for (int pos=0; varName[pos]!=0; ++pos) variables->dict[variables->count].key[pos] = varName[pos];
 	variables->dict[variables->count].key[varLength] = 0;
@@ -82,9 +92,9 @@ int parseVarDeclare(char *varName, struct varStruct *variables){
 
 void parsePrintString(char *scriptLine){
 	int start=findQuotes(scriptLine), pos=start;
-	for (  ; scriptLine[pos] != '"'; ++pos) if (scriptLine[pos] == '\') parseEscapeSequence(scriptLine, pos);
+	for (  ; scriptLine[pos] != '"'; ++pos) if (scriptLine[pos] == '\\') parseEscapeSequence(scriptLine, pos);
 	scriptLine[pos] = 0;
-	printf("%s", scriptLine[start]);
+	printf("%s", &scriptLine[start]);
 }
 
 char parseEscapeSequence(char *scriptLine, int index){
@@ -95,10 +105,16 @@ char parseEscapeSequence(char *scriptLine, int index){
 		case 't':
 			scriptLine[index] = '\t';
 			break;
-		case '\':
-			scriptLine[index] = '\';
+		case '"':
+			scriptLine[index] = '"';
+			break;
+		case '\'':
+			scriptLine[index] = '\'';
+			break;
+		case '\\':
+			scriptLine[index] = '\\';
 		default:
-			exit(fprintf(stderr, "Unrecognised escape sequence: \\%c\n", c));
+			exit(fprintf(stderr, "Unrecognised escape sequence: \\%c\n", scriptLine[index+1]));
 	}
 	
 	// Shuffle subsequent characters left
@@ -117,7 +133,7 @@ int varExists(char *varName, struct varStruct *variables){
 
 int varNameValid(char *varName){
 	if (!varFirstCharValid(varName[0])) return 0;
-	for (int i=1; varName[i]!=0; ++i) if (!varFirstCharValid(varName[i]) return 0;
+	for (int i=1; varName[i]!=0; ++i) if (!varFirstCharValid(varName[i])) return 0;
 	return 1;
 }
 
@@ -176,8 +192,8 @@ struct tokenStruct tokenise(char *line){
 		if (!whitespace(line[linePos])) {
 			int tokenPos=0;
 			do {
-				tokens.tokens[token][tokenPos++] = line[linePos]
-			} while (!whitespace(line[++linePos]))
+				tokens.tokens[token][tokenPos++] = line[linePos];
+			} while (!whitespace(line[++linePos]));
 			tokens.tokens[token][tokenPos] = 0;
 			++token;
 		}
