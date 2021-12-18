@@ -37,7 +37,7 @@ int varCharValid(char c);
 int getStringLength(char *string);
 int stringEquals(char *a, char *b);
 struct tokenStruct tokenise(char *line);
-int main(char **argv){
+int main(int argc, char **argv){
 	struct varStruct variables = { .count = 0, .dict = NULL };
 
 	char scriptLine[100];
@@ -168,10 +168,16 @@ struct tokenStruct tokenise(char *line){
 	for (int pos=0; line[pos]!=0 ; ){
 		if (!whitespace(line[pos]) ) {
 			++tokens.count;
-			while (!whitespace(line[++pos]));
+			if (line[pos] == '"' || line[pos] == '\''){
+				char marker = line[pos++];
+				while (line[pos++] != marker);
+			}
+			else while (!whitespace(line[++pos]));
 		}
 		else ++pos;
 	}
+
+	fprintf(stderr, "Number of tokens: %i\n", tokens.count);
 
 	// Allocate char** for tokens
 	tokens.tokens = malloc(tokens.count * sizeof(char*));
@@ -180,7 +186,11 @@ struct tokenStruct tokenise(char *line){
 	for (int pos=0, token=0; line[pos]!=0 ; ){
 		if (!whitespace(line[pos])) {
 			int length=2;
-			while (!whitespace(line[++pos])) ++length;
+			if (line[pos] == '"' || line[pos] == '\''){
+				char marker = line[pos++];
+				while (line[pos++] != marker) ++length;
+			}
+			else while (!whitespace(line[++pos])) ++length;
 			tokens.tokens[token] = malloc(length * sizeof(char));
 			++token;
 		}
@@ -191,7 +201,11 @@ struct tokenStruct tokenise(char *line){
 	for (int linePos=0, token=0; line[linePos] != 0 ; ){
 		if (!whitespace(line[linePos])) {
 			int tokenPos=0;
-			do {
+			if (line[linePos] == '"' || line[linePos] == '\''){
+				char marker = line[linePos++];
+				while (line[linePos++] != marker) tokens.tokens[token][tokenPos++] = line[linePos];
+			}
+			else do {
 				tokens.tokens[token][tokenPos++] = line[linePos];
 			} while (!whitespace(line[++linePos]));
 			tokens.tokens[token][tokenPos] = 0;
