@@ -1,2 +1,1 @@
-var hello
-print "hello there world"
+print "hello\t\"there\"\tworld\n"
