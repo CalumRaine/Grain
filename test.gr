@@ -1,1 +1,7 @@
 print "hello\t\"there\"\tworld\n"
+
+var test
+test = "hi"
+
+print test
+print "\n"
