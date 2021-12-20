@@ -16,6 +16,11 @@ struct varStruct {
 	struct varDict *dict;
 };
 
+struct fileStruct {
+	int count;
+	struct fileDict *dict;
+};
+
 int findWhitespace(char *txt, int i){
 	// Increments cursor until finds whitespace
 	while (txt[i] != ' ' && txt[i] != '\t' && txt[i] != '\n') ++i;
@@ -83,31 +88,40 @@ int stringEquals(char *comp, char *txt){
 
 int main(int argc, char **argv){
 	struct varStruct variables = { .count = 0, .dict = NULL };
+	struct fileStruct files = { .count = 0, .dict = NULL};
 
 	char scriptLine[100];
 	FILE *scriptFile = fopen(argv[1], "r");
 	for ( fgets(scriptLine, 100, scriptFile) ; !feof(scriptFile); fgets(scriptLine, 100, scriptFile) ) {
+		//fprintf(stderr, "Incoming line: %s", scriptLine);
 		int wordStart = skipWhitespace(scriptLine, 0);
+		if (scriptLine[wordStart] == '\n') {
+		//	fprintf(stderr, "Continuing\n");
+			continue;
+		}
 		int wordEnd = findWhitespace(scriptLine, wordStart);
-		if (scriptLine[wordEnd] == '\n') continue;
-		else if (substringEquals("var", scriptLine, wordStart, wordEnd)){
+		if (substringEquals("var", scriptLine, wordStart, wordEnd)){
+		//	fprintf(stderr, "ERR: var\n");
 			wordStart = skipWhitespace(scriptLine, wordEnd+1);
 			wordEnd = findWhitespace(scriptLine, wordStart);
 			variables.dict = realloc(variables.dict, (variables.count + 1) * sizeof(struct varDict));
 			variables.dict[variables.count].key = malloc( (wordEnd - wordStart + 2) * sizeof(char) );
 			variables.dict[variables.count].key[wordEnd - wordStart + 1] = 0;
 			for (int pos=0; wordStart <= wordEnd; ++pos, ++wordStart) variables.dict[variables.count].key[pos] = scriptLine[wordStart];
-			//fprintf(stderr, "Variable '%s' declared. %p %p\n", variables.dict[variables.count].key, variables.dict, variables.dict[variables.count].key);
+			fprintf(stderr, "Var '%s' declared\n", variables.dict[variables.count].key);
 			++variables.count;
 		}
 		else if (substringEquals("print", scriptLine, wordStart, wordEnd)){
+		//	fprintf(stderr, "ERR: print\n");
 			wordStart = skipWhitespace(scriptLine, wordEnd+1);
 			if (isQuote(scriptLine[wordStart])){
+		//		fprintf(stderr, "ERR: print quote\n");
 				wordEnd = findQuote(scriptLine, wordStart);
 				scriptLine[wordEnd]=0;
 				printf("%s", &scriptLine[wordStart+1]);
 			}
 			else {
+		//		fprintf(stderr, "ERR: print variable\n");
 				wordEnd = findWhitespace(scriptLine, wordStart);
 				for (int v=0; v < variables.count; ++v) {
 					if (substringEquals(variables.dict[v].key, scriptLine, wordStart, wordEnd)){
@@ -117,13 +131,27 @@ int main(int argc, char **argv){
 				}
 			}
 		}
+		else if (substringEquals("file", scriptLine, wordStart, wordEnd)){
+			//fprintf(stderr, "ERR: file\n");
+			wordStart = skipWhitespace(scriptLine, wordEnd+1);
+			for (wordEnd = wordStart; scriptLine[wordEnd] != '('; ++wordEnd);
+			files.dict = realloc(files.dict, (files.count + 1) * sizeof(struct fileDict));
+			int length = wordEnd - wordStart;
+			files.dict[files.count].key = malloc( (length + 1) * sizeof(char) );
+			for (int pos=0 ; wordStart < wordEnd; ++wordStart, ++pos) files.dict[files.count].key[pos] = scriptLine[wordStart];
+			files.dict[files.count].key[length] = 0;
+			fprintf(stderr, "File '%s' declared\n", files.dict[files.count].key);
+			++files.count;
+		}
 		else {
+			//fprintf(stderr, "ERR: else variable\n");
 			int varIndex;
 			for (varIndex = 0; substringEquals(variables.dict[varIndex].key, scriptLine, wordStart, wordEnd) == 0 ; ++varIndex);
 			wordStart = skipWhitespace(scriptLine, wordEnd+1);
 			wordEnd = findWhitespace(scriptLine, wordStart);
 			if (substringEquals("=", scriptLine, wordStart, wordEnd)){
 				// assignment
+				//fprintf(stderr, "ERR: assignment\n");
 				wordStart = skipWhitespace(scriptLine, wordEnd+1);
 				wordEnd = findWhitespace(scriptLine, wordStart);
 				if (isQuote(scriptLine[wordStart])){
