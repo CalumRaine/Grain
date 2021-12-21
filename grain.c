@@ -19,6 +19,12 @@ struct varDict {
 	char *value;
 };
 
+struct sepDict {
+	char *key;
+	char *value;
+	int index;
+};
+
 struct varStruct {
 	int count;
 	struct varDict *dict;
@@ -27,6 +33,11 @@ struct varStruct {
 struct fileStruct {
 	int count;
 	struct fileDict *dict;
+};
+
+struct sepStruct {
+	int count;
+	struct sepDict *dict;
 };
 
 char convertEscapeSequence(char escapeChar){
@@ -57,7 +68,7 @@ int findToken(char *txt, int *cursors){
 		0 if find terminator
 		1 if find quotation.
 		2 if find word.
-	 * cursor[START] begins scanning from after cursor[END]
+	 * cursors[START] begins scanning from after cursors[END]
 	 * Quotations:
 		* Escape characters automatically converted and removed from string
 		* Closing quotation converted to 0 terminator	*/
@@ -116,7 +127,9 @@ int findToken(char *txt, int *cursors){
 						   && txt[cursors[END]] != ';'
 						   && txt[cursors[END]] != ','
 						   && txt[cursors[END]] != '('
-						   && txt[cursors[END]] != ')' ; ++cursors[END]);
+						   && txt[cursors[END]] != ')'
+						   && txt[cursors[END]] != '['
+						   && txt[cursors[END]] != ']' ; ++cursors[END]);
 		return VARIABLE;
 	}
 }
@@ -154,8 +167,34 @@ char *stringSave(char *dest, char *source){
 	return dest;
 }
 
+int findVar(struct varStruct vars, char *txt, int *cursors){
+	for (int v=0; v < vars.count; ++v){
+		if (substringEquals(vars.dict[v].key, txt, cursors)) return v;
+	}
+	return -1;
+}
+
+int substring2Num(char *txt, int *cursors){
+	int result = 0;
+	for (int i=cursors[START]; i < cursors[END]; ++i){
+		result *= 10;
+		result += (int)(txt[i] - 48);
+	}
+	return result;
+}
+
+int string2Num(char *txt){
+	int result=0;
+	for (int i=0; txt[i] != 0; ++i){
+		result *= 10;
+		result += (int)(txt[i] - 48);
+	}
+	return result;
+}
+
 int main(int argc, char **argv){
-	struct varStruct variables = { .count = 0, .dict = NULL };
+	struct varStruct vars = { .count = 0, .dict = NULL };
+	struct sepStruct seps = { .count = 0, .dict = NULL };
 	struct fileStruct files = { .count = 0, .dict = NULL};
 
 	char scriptLine[100];
@@ -170,23 +209,18 @@ int main(int argc, char **argv){
 		else if (substringEquals("var", scriptLine, cursors)){
 			fprintf(stderr, "\t\tVar declaration\n");
 			findToken(scriptLine, cursors);
-			variables.dict = realloc(variables.dict, (variables.count + 1) * sizeof(struct varDict));
-			variables.dict[variables.count].key = substringSave(variables.dict[variables.count].key, scriptLine, cursors);
-			variables.dict[variables.count].value = NULL;
-			fprintf(stderr, "\t\t%s declared\n\n", variables.dict[variables.count].key);
-			++variables.count;
+			vars.dict = realloc(vars.dict, (vars.count + 1) * sizeof(struct varDict));
+			vars.dict[vars.count].key = substringSave(vars.dict[vars.count].key, scriptLine, cursors);
+			vars.dict[vars.count].value = NULL;
+			fprintf(stderr, "\t\t%s declared\n\n", vars.dict[vars.count].key);
+			++vars.count;
 		}
 		else if (substringEquals("print", scriptLine, cursors)){
 			fprintf(stderr, "\t\tPrint command\n");
 			if (findToken(scriptLine, cursors) == QUOTE) fprintf(stderr, "\t\tPrinting quotation\n\n"), printf("%s", &scriptLine[cursors[START]]);
 			else {
-				fprintf(stderr, "\t\tLooking for variable\n\n");
-				for (int v=0; v < variables.count; ++v) {
-					if (substringEquals(variables.dict[v].key, scriptLine, cursors)){
-						printf("%s", variables.dict[v].value);
-						break;
-					}
-				}
+				fprintf(stderr, "\t\tPrinting variable\n\n");
+				printf("%s", vars.dict[findVar(vars, scriptLine, cursors)].value);
 			}
 		}
 		else if (substringEquals("file", scriptLine, cursors)){
@@ -203,12 +237,7 @@ int main(int argc, char **argv){
 			}
 			else {
 				fprintf(stderr, "\t\tFilename is variable\n");
-				for (int v=0; v < variables.count; ++v) {
-					if (substringEquals(variables.dict[v].key, scriptLine, cursors)){
-						files.dict[files.count].file = fopen(variables.dict[v].value, "r");
-						break;
-					}
-				}
+				files.dict[files.count].file = fopen(vars.dict[findVar(vars, scriptLine, cursors)].value, "r");
 			}
 
 			
@@ -221,12 +250,7 @@ int main(int argc, char **argv){
 				}
 				else {
 					fprintf(stderr, "\t\tSeparator is var name\n");
-					for (int v=0; v < variables.count; ++v) {
-						if (substringEquals(variables.dict[v].key, scriptLine, cursors)){
-							files.dict[files.count].sep = stringSave(files.dict[files.count].sep, variables.dict[v].value);
-							break;
-						}
-					}
+					files.dict[files.count].sep = stringSave(files.dict[files.count].sep, vars.dict[findVar(vars, scriptLine, cursors)].value);
 				}
 			}
 			else {
@@ -239,26 +263,61 @@ int main(int argc, char **argv){
 			fprintf(stderr, "\t\tFile declared.  Name = %s Sep = %s\n\n", files.dict[files.count].key, files.dict[files.count].sep);
 			++files.count;
 		}
+		else if (substringEquals("sep", scriptLine, cursors)){
+			fprintf(stderr, "\t\tSep declaration\n");
+			findToken(scriptLine, cursors);
+			seps.dict = realloc(seps.dict, (seps.count + 1) * sizeof(struct sepStruct));
+			seps.dict[seps.count].key = NULL;
+			seps.dict[seps.count].value = NULL;
+			seps.dict[seps.count].key = substringSave(seps.dict[seps.count].key, scriptLine, cursors);
+			
+			if (findToken(scriptLine, cursors) == QUOTE) {
+				fprintf(stderr, "\t\tSeparator is quote\n");
+				seps.dict[seps.count].value = substringSave(seps.dict[seps.count].value, scriptLine, cursors);
+			}
+			else {
+				fprintf(stderr, "\t\tSeparator is variable name\n");
+				seps.dict[seps.count].value = stringSave(seps.dict[seps.count].value, vars.dict[findVar(vars, scriptLine, cursors)].value);
+			}
+
+			findToken(scriptLine, cursors);
+			if (scriptLine[cursors[END]] == '[') {
+				fprintf(stderr, "\t\tIndex provided\n");
+				findToken(scriptLine, cursors);
+				if (scriptLine[cursors[START]] >= 48 && scriptLine[cursors[START]] <= 57) {
+					fprintf(stderr, "\t\tIndex is numerical\n");
+					seps.dict[seps.count].index = substring2Num(scriptLine, cursors);
+				}
+				else {
+					fprintf(stderr, "\t\tIndex is variable name\n");
+					seps.dict[seps.count].index = string2Num(vars.dict[findVar(vars, scriptLine, cursors)].value);
+				}
+			}
+			else {
+				fprintf(stderr, "\t\tNo index provided\n");
+				seps.dict[seps.count].index = -1;
+			}
+
+			fprintf(stderr, "\t\tSep declared.  name = %s sep = %s index = %i\n\n", seps.dict[seps.count].key, seps.dict[seps.count].value, seps.dict[seps.count].index);
+		}
 		else {
 			fprintf(stderr, "\t\tAssuming variable assignment\n");
-			int destIndex;
-			for (destIndex = 0; !substringEquals(variables.dict[destIndex].key, scriptLine, cursors) ; ++destIndex);
-			fprintf(stderr, "\t\tAssigning to '%s'\n", variables.dict[destIndex].key);
+			int destIndex = findVar(vars, scriptLine, cursors);
+			fprintf(stderr, "\t\tAssigning to '%s'\n", vars.dict[destIndex].key);
 			findToken(scriptLine, cursors);
 			if (substringEquals("=", scriptLine, cursors)){
 				// assignment
 				//fprintf(stderr, "ERR: assignment\n");
 				if (findToken(scriptLine, cursors) == QUOTE){
 					fprintf(stderr, "\t\tAssigning quote: '%s'\n\n", &scriptLine[cursors[START]]);
-					variables.dict[destIndex].value = substringSave(variables.dict[destIndex].value, scriptLine, cursors);
+					vars.dict[destIndex].value = substringSave(vars.dict[destIndex].value, scriptLine, cursors);
 				}
 				else {
 					// copying value from variable
 					fprintf(stderr, "\t\tAssigning variable value\n");
-					int sourceIndex;
-					for (sourceIndex = 0; !substringEquals(variables.dict[sourceIndex].key, scriptLine, cursors); ++sourceIndex);
-					fprintf(stderr, "\t\tAssigning value from %s : %s\n\n", variables.dict[sourceIndex].key, variables.dict[sourceIndex].value);
-					variables.dict[destIndex].value = stringSave(variables.dict[destIndex].value, variables.dict[sourceIndex].value);
+					int sourceIndex = findVar(vars, scriptLine, cursors);
+					fprintf(stderr, "\t\tAssigning value from %s : %s\n\n", vars.dict[sourceIndex].key, vars.dict[sourceIndex].value);
+					vars.dict[destIndex].value = stringSave(vars.dict[destIndex].value, vars.dict[sourceIndex].value);
 				}
 			}
 		}
