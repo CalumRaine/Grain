@@ -1,7 +1,6 @@
-print "hello\t\"there\"\tworld\n"
-
-var test
-test = "hi"
-
-print test
-print "\n"
+file test("Pip.txt", "Philip")
+in test
+	print
+	print "\n"
+	print "\n ------------------- CALUM ----------------- \n"
+	out
