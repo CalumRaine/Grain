@@ -1,6 +1,13 @@
-file test("Pip.txt", "Philip")
+file test("addresses.csv", "\n")
+sep mySep(",")
+
 in test
-	print
-	print "\n"
-	print "\n ------------------- CALUM ----------------- \n"
+	in mySep[1]
+		print
+		out
+	in mySep[2]
+		print " "
+		print
+		print "\n"
+		out
 	out
