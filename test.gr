@@ -1,13 +1,16 @@
-file test("addresses.csv", "\n")
-sep mySep(",")
+file myFile("example.txt", "\n")
+sep col(" ")
+sep date("-")
 
-in test
-	in mySep[1]
-		print
-		out
-	in mySep[2]
-		print " "
-		print
-		print "\n"
-		out
+in myFile
+	print col[1] "'s birth month is "
+	in col[4]
+		print date[1] "\n"
 	out
+out
+
+
+
+
+
+
