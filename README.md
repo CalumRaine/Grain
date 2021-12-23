@@ -13,16 +13,33 @@ name: Laura Arnold  dob: 2001-04-17
 ### Script
 ```
 file testFile("my_file.txt", *)
-sep line("\n"), column()
-sep initial("")[0], component("-")
+sep line("\n")
+sep column()
+sep initial("")[0]
+sep component("-")
 
-scan testFile.line
-  print column[1] " " column[2].initial "\n"
-  print "\t" column[3]
-  switch column[4]
-    print " year=" component[0] " month=" component[1] " day=" component[2] "\n"
-    switch
-  print column[2]
+in testFile
+	in line
+		print column[1]
+		print " " 
+		in column[2]
+			print initial
+			print "\n"
+		out
+
+		print "\t"
+		print column[3]
+		in column[4]
+			print " year="
+			print component[0]
+			print " month="
+			print component[1]
+			print " day="
+			print component[2]
+			print "\n"
+		out
+	out
+out
 ```
 
 ### Output
