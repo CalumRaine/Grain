@@ -51,7 +51,6 @@ Laura A
 * Allow multiple comma-separated sep/file/var declarations
 * Allow stream editing by reassignment of sep/file (i.e. `column[2] = "hello"`)
 * Implement whitespace scanning for seps
-* Allow mathematical variable reassignment (such as `variable += 14`)
 
 ### Roadmap
 1. `var name = ""`

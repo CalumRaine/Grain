@@ -217,7 +217,7 @@ int substring2Num(char *txt, int *cursors){
 }
 
 int string2Num(char *txt){
-	fprintf(stderr, "\t\t\tSTRING2NUM called\n");
+	fprintf(stderr, "\t\t\tSTRING2NUM called on: %s\n", txt);
 	// Converts string to integer
 	int result=0;
 	for (int i=0; txt[i] != 0; ++i){
@@ -304,9 +304,29 @@ void printSubstring(char *txt, int start, int stop){
 	txt[stop] = swap;
 }
 
-int index2Int(struct varStruct vars, char *txt, int *cursors){
+int index2Num(struct varStruct vars, char *txt, int *cursors){
 	fprintf(stderr, "\t\t\tINDEX2INT called\n");
 	return txt[cursors[START]] >= 48 && txt[cursors[START]] <= 57 ? substring2Num(txt, cursors) : string2Num(vars.dict[findVar(vars, txt, cursors)].val);
+}
+
+char *num2String(char *txt, int num){
+	fprintf(stderr, "\t\t\tNUM2STRING called: %p %i\n", txt, num);
+	int digits = num < 1 ? 1 : 0;
+	for (int cpy=num; cpy != 0; cpy/=10, ++digits);
+
+	fprintf(stderr, "\t\t\t%i chars needed\n", digits);
+	txt = realloc(txt, (digits+1)*sizeof(char));
+	txt[digits]=0;
+
+	if (num < 0) txt[0]='-';
+
+	do {
+		fprintf(stderr, "\t\t\tPutting %c into txt[%i]\n", (num%10)+48, digits-1);
+		txt[--digits] = (num % 10) + 48;
+	} while ( (num/=10) != 0);
+
+	fprintf(stderr, "\t\t\tResult is %s\n", txt);
+	return txt;
 }
 
 int main(int argc, char **argv){
@@ -354,7 +374,7 @@ int main(int argc, char **argv){
 						if ( (addr=findSep(seps, scriptLine, cursors)) != -1 ) {
 							fprintf(stderr, "\t\tSep found (index=%i name=%s sep=%s)\n", addr, seps.dict[addr].key, seps.dict[addr].val);
 							findToken(scriptLine, cursors);
-							int index = index2Int(vars, scriptLine, cursors);
+							int index = index2Num(vars, scriptLine, cursors);
 							fprintf(stderr, "\t\tIndex is %i\n", index);
 							char *buff = loops.stack[loops.ptr].buff;
 							int stop, start = skipSep(buff, seps.dict[addr], index, loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
@@ -368,7 +388,7 @@ int main(int argc, char **argv){
 						else if ( (addr=findFile(files, scriptLine, cursors)) != -1 ){
 							fprintf(stderr, "\t\tFile found (index=%i name=%s sep=%s)\n", addr, files.dict[addr].key, files.dict[addr].sep);
 							findToken(scriptLine, cursors);
-							int index = index2Int(vars, scriptLine, cursors);
+							int index = index2Num(vars, scriptLine, cursors);
 							fprintf(stderr, "\t\tIndex is %i\n", index);
 							char *string = loadFile(NULL, files.dict[addr], &index, index); // &index is naughty
 							printf("%s\n", string);
@@ -514,7 +534,7 @@ int main(int argc, char **argv){
 				fprintf(stderr, "\t\tIndex is provided\n");
 				loop->isLoop = FALSE;
 				findToken(scriptLine, cursors);
-				index = index2Int(vars, scriptLine, cursors);
+				index = index2Num(vars, scriptLine, cursors);
 				fprintf(stderr, "\t\tIndex is %i\n", index);
 			}
 			else {
@@ -607,6 +627,11 @@ int main(int argc, char **argv){
 					vars.dict[destIndex].val = substringSave(vars.dict[destIndex].val, scriptLine, cursors);
 					fprintf(stderr, "\t\tAssigning quote: '%s'\n\n", vars.dict[destIndex].val);
 				}
+				else if (scriptLine[cursors[START]] >= 48 && scriptLine[cursors[START]] <= 57){
+					fprintf(stderr, "\t\tAssigning numerical value\n");
+					vars.dict[destIndex].val = substringSave(vars.dict[destIndex].val, scriptLine, cursors);
+					fprintf(stderr, "\t\tSaved value is %s\n", vars.dict[destIndex].val);
+				}
 				else {
 					// copying val from variable
 					fprintf(stderr, "\t\tAssigning variable val\n");
@@ -614,6 +639,41 @@ int main(int argc, char **argv){
 					fprintf(stderr, "\t\tAssigning val from %s : %s\n\n", vars.dict[sourceIndex].key, vars.dict[sourceIndex].val);
 					vars.dict[destIndex].val = stringSave(vars.dict[destIndex].val, vars.dict[sourceIndex].val);
 				}
+			}
+			else if (substringEquals("+=", scriptLine, cursors)){
+				fprintf(stderr, "\t\tAddition command\n");
+				findToken(scriptLine, cursors);
+				int maths = index2Num(vars, scriptLine, cursors) + string2Num(vars.dict[destIndex].val);
+				fprintf(stderr, "New number is %i\n", maths);
+				vars.dict[destIndex].val = num2String(vars.dict[destIndex].val, maths);
+			}
+			else if (substringEquals("-=", scriptLine, cursors)){
+				fprintf(stderr, "\t\tSubstraction command\n");
+				findToken(scriptLine, cursors);
+				int maths = string2Num(vars.dict[destIndex].val) - index2Num(vars, scriptLine, cursors); 
+				fprintf(stderr, "New number is %i\n", maths);
+				vars.dict[destIndex].val = num2String(vars.dict[destIndex].val, maths);
+			}
+			else if (substringEquals("/=", scriptLine, cursors)){
+				fprintf(stderr, "\t\tDivision command\n");
+				findToken(scriptLine, cursors);
+				int maths = string2Num(vars.dict[destIndex].val) / index2Num(vars, scriptLine, cursors) ;
+				fprintf(stderr, "New number is %i\n", maths);
+				vars.dict[destIndex].val = num2String(vars.dict[destIndex].val, maths);
+			}
+			else if (substringEquals("*=", scriptLine, cursors)){
+				fprintf(stderr, "\t\tMultiplication command\n");
+				findToken(scriptLine, cursors);
+				int maths = index2Num(vars, scriptLine, cursors) * string2Num(vars.dict[destIndex].val);
+				fprintf(stderr, "New number is %i\n", maths);
+				vars.dict[destIndex].val = num2String(vars.dict[destIndex].val, maths);
+			}
+			else if (substringEquals("%=", scriptLine, cursors)){
+				fprintf(stderr, "\t\tModulo command\n");
+				findToken(scriptLine, cursors);
+				int maths = string2Num(vars.dict[destIndex].val) % index2Num(vars, scriptLine, cursors) ;
+				fprintf(stderr, "New number is %i\n", maths);
+				vars.dict[destIndex].val = num2String(vars.dict[destIndex].val, maths);
 			}
 		}
 	}
