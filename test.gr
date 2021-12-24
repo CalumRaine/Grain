@@ -1,10 +1,7 @@
-var one
-one = "hey" 
+var tst = "hello", new = "there " tst , final="son"
+print tst "\n"
+print new "\n"
+print final "\n"
 
-var two
-two = "you"
-
-one = one " and " two
-print one "\n"
 
 

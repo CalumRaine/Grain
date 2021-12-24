@@ -5,7 +5,7 @@
 #define SEP 1
 
 enum pos {START, END};
-enum tokenType {TERMINATOR, QUOTE, VARIABLE};
+enum tokenType {TERMINATOR, QUOTE, VARIABLE, COMMA, ASSIGNMENT, MATHS};
 enum boolean {FALSE, TRUE};
 
 struct fileDict {
@@ -99,6 +99,19 @@ int findToken(char *txt, int *cursors){
 	case ';':
 	case '\0':
 		return TERMINATOR;
+	case ',':
+		cursors[END] = cursors[START];
+		return COMMA;
+	case '=':
+		cursors[END] = cursors[START];
+		return ASSIGNMENT;
+	case '+':
+	case '-':
+	case '*':
+	case '/':
+	case '%':
+		cursors[END] = cursors[START];
+		return MATHS;
 	case '\'':
 	case '"':
 	case '`':
@@ -138,6 +151,7 @@ int findToken(char *txt, int *cursors){
 						   && txt[cursors[END]] != '\t' 
 						   && txt[cursors[END]] != '\n' 
 					           && txt[cursors[END]] != 0 
+					           && txt[cursors[END]] != '=' 
 						   && txt[cursors[END]] != ';'
 						   && txt[cursors[END]] != ','
 						   && txt[cursors[END]] != '('
@@ -329,6 +343,72 @@ char *num2String(char *txt, int num){
 	return txt;
 }
 
+char *substringJoin(char *dest, char *source, int from, int to){
+	fprintf(stderr, "\t\t\tSUBSTRINGJOIN called\n");
+	int len;
+	if (dest == NULL) len = 0;
+	else for (len=0; dest[len]!=0; ++len);
+	fprintf(stderr, "\t\t\tdestLen = %i\n", len);
+	
+	fprintf(stderr, "\t\t\tNew alloc length is %i\n", len + to - from + 1);
+	dest = realloc(dest, (len + to - from + 1) * sizeof(char));
+	for (int dPos=len, sPos=from; sPos < to; ++dPos, ++sPos) dest[dPos] = source[sPos];
+	fprintf(stderr, "\t\t\tSetting dest[%i] to 0\n", len + to - from);
+	dest[len + to - from] = 0;
+	fprintf(stderr, "\t\t\tdest is %s\n", dest);
+	return dest;
+}
+
+char *stringJoin(char *dest, char *src){
+	fprintf(stderr, "\t\t\tSTRINGJOIN called: %p %p\n", dest, src);
+	fprintf(stderr, "\t\t\tdest = %s\n", dest);
+	fprintf(stderr, "\t\t\tsrc = %s\n", src);
+	int dLen, sLen;
+	if (dest == NULL) dLen = 0;
+	else for (dLen=0; dest[dLen]!=0; ++dLen);
+	fprintf(stderr, "\t\t\tdLen = %i\n", dLen);
+	for (sLen=0; src[sLen]!=0; ++sLen); 
+	fprintf(stderr, "\t\t\tsLen = %i\n", sLen);
+
+	dest = realloc(dest, (dLen + sLen + 1) * sizeof(char));
+	for (int dPos=dLen, sPos=0; src[sPos]!=0; ++dPos, ++sPos) dest[dPos] = src[sPos];
+	dest[dLen + sLen] = 0;
+	return dest;
+}
+
+char *varStrAss(struct varStruct vars, struct sepStruct seps, struct fileStruct files, struct loopStack loops, char *scriptLine, int *cursors){
+	fprintf(stderr, "\t\t\tVARSTRASS called\n");
+	char *buff = NULL;
+	for (int status=findToken(scriptLine, cursors), addr, start, stop; status != TERMINATOR && status != COMMA; status=findToken(scriptLine, cursors)){
+		if (status == QUOTE || scriptLine[cursors[START]] >= 48 && scriptLine[cursors[START]] <= 57){
+			fprintf(stderr, "\t\t\t%s detected\n", status == QUOTE? "QUOTE" : "NUMBER");
+			buff = substringJoin(buff, scriptLine, cursors[START], cursors[END]);
+		}
+		else if (scriptLine[cursors[END]] == '['){
+			if ( (addr=findSep(seps, scriptLine, cursors)) != -1 ) {
+				findToken(scriptLine, cursors);
+				start = skipSep(loops.stack[loops.ptr].buff, seps.dict[addr], token2Num(vars, scriptLine, cursors), loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
+				if (start == -1) fprintf(stderr, " does not exist\n"), exit(0);
+				else if ( (stop = sepSearch(loops.stack[loops.ptr].buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop)) == -1) stop = loops.stack[loops.ptr].stop;
+				buff = substringJoin(buff, loops.stack[loops.ptr].buff, start, stop);
+			}
+			else if ( (addr=findFile(files, scriptLine, cursors)) != -1 ){
+				findToken(scriptLine, cursors);
+				char *string = loadFile(NULL, files.dict[addr], &start, token2Num(vars, scriptLine, cursors));
+				buff = stringJoin(buff, string);
+				free(string);
+			}
+		}
+		else {  // variable
+			fprintf(stderr, "\t\t\tVariable detected\n");
+			buff = stringJoin(buff, vars.dict[findVar(vars, scriptLine, cursors)].val);
+		}
+
+		if (scriptLine[cursors[END]] == ',') break;
+	}
+	return buff;
+}
+
 int main(int argc, char **argv){
 	struct varStruct vars = { .count = 0, .dict = NULL };
 	struct sepStruct seps = { .count = 0, .dict = NULL };
@@ -346,13 +426,19 @@ int main(int argc, char **argv){
 		}
 		else if (substringEquals("var", scriptLine, cursors)){
 			fprintf(stderr, "\t\tVAR command\n");
-			findToken(scriptLine, cursors);
-			vars.dict = realloc(vars.dict, (vars.count + 1) * sizeof(struct varDict));
-			struct varDict *var = &vars.dict[vars.count];
-			var->val = var->key = NULL;
-			var->key = substringSave(var->key, scriptLine, cursors);
-			fprintf(stderr, "\t\t%s declared\n\n", var->key);
-			++vars.count;
+			do {
+				findToken(scriptLine, cursors);
+				vars.dict = realloc(vars.dict, (vars.count + 1) * sizeof(struct varDict));
+				struct varDict *var = &vars.dict[vars.count];
+				var->val = var->key = NULL;
+				var->key = substringSave(var->key, scriptLine, cursors);
+				fprintf(stderr, "\t\t%s declared\n\n", var->key);
+				++vars.count;
+				if (scriptLine[cursors[END]] == '=' || scriptLine[cursors[END]] != ',' && findToken(scriptLine, cursors) == ASSIGNMENT){
+					fprintf(stderr, "\t\tVariable declaration\n");
+					var->val = varStrAss(vars, seps, files, loops, scriptLine, cursors);
+				}
+			} while (scriptLine[cursors[START]] == ',' || scriptLine[cursors[END]] == ',');
 		}
 		else if (substringEquals("print", scriptLine, cursors)){
 			fprintf(stderr, "\t\tPRINT command\n");
@@ -442,8 +528,7 @@ int main(int argc, char **argv){
 			}
 
 			// Get separator
-			findToken(scriptLine, cursors);
-			if (scriptLine[cursors[START]] == ','){
+			if (findToken(scriptLine, cursors) == COMMA){
 				fprintf(stderr, "\t\tSeparator provided\n");
 				if (findToken(scriptLine, cursors) == QUOTE) {
 					fprintf(stderr, "\t\tSeparator = quote\n");
@@ -620,89 +705,16 @@ int main(int argc, char **argv){
 			fprintf(stderr, "\t\tAssuming variable assignment\n");
 			int destIndex = findVar(vars, scriptLine, cursors);
 			fprintf(stderr, "\t\tAssigning to '%s'\n", vars.dict[destIndex].key);
-			findToken(scriptLine, cursors);
-			if (substringEquals("=", scriptLine, cursors)){
-				// assignment
-				char *buff = NULL;
-				int len = 0;
-				for (int status=findToken(scriptLine, cursors); status != TERMINATOR; status=findToken(scriptLine, cursors)){
-					if (status == QUOTE || scriptLine[cursors[START]] >= 48 && scriptLine[cursors[START]] <= 57){
-						fprintf(stderr, "\t\tStatus is %s\n", status == QUOTE ? "QUOTE" : "NUM");
-						fprintf(stderr, "\t\tWill reallocate buff %p to len %i\n", buff, len + cursors[END] - cursors[START] + 1);
-						buff = realloc(buff, (len + cursors[END] - cursors[START] + 1) * sizeof(char));
-						fprintf(stderr, "\t\tNew buff is %p\n", buff);
-						
-						for (int dest=len, source=cursors[START]; source < cursors[END]; ++source, ++dest) {
-							fprintf(stderr, "\t\tCopying %c from script[%i] to dest[%i]\n", scriptLine[source], source, dest);
-							buff[dest] = scriptLine[source];
-						}
-						len += cursors[END] - cursors[START];
-						fprintf(stderr, "\t\tSetting buff[%i] to 0\n", cursors[END] - cursors[START]);
-						buff[len] = 0;
-					}
-					else if (scriptLine[cursors[END]] == '['){
-						fprintf(stderr, "\t\tIndex found.  Must be sep or file\n");
-						int addr;
-						if ( (addr=findSep(seps, scriptLine, cursors)) != -1 ) {
-							fprintf(stderr, "\t\tSep found (index=%i name=%s sep=%s)\n", addr, seps.dict[addr].key, seps.dict[addr].val);
-							findToken(scriptLine, cursors);
-							int index = token2Num(vars, scriptLine, cursors);
-							fprintf(stderr, "\t\tIndex is %i\n", index);
-							int stop, start = skipSep(loops.stack[loops.ptr].buff, seps.dict[addr], index, loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
-							if (start == -1) fprintf(stderr, " does not exist\n"), exit(0);
-							else if ( (stop = sepSearch(loops.stack[loops.ptr].buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop)) == -1) stop = loops.stack[loops.ptr].stop;
-							fprintf(stderr, "Will reallocate buff %p to len %i\n", buff, len + stop - start + 1);
-							buff = realloc(buff, (len + stop - start + 1) * sizeof(char));
-							fprintf(stderr, "\t\tNew buff is %p\n", buff);
-							for (int dest=len, source=start; source < stop; ++source, ++dest) {
-								fprintf(stderr, "\t\tCopying %c from loopStack to dest[%i]\n", loops.stack[loops.ptr].buff[source], dest);
-								buff[dest] = loops.stack[loops.ptr].buff[source];
-							}
-							len += stop - start;
-							fprintf(stderr, "\t\tSetting buff[%i] to 0\n", len);
-							buff[len] = 0;
-						}
-						else if ( (addr=findFile(files, scriptLine, cursors)) != -1 ){
-							fprintf(stderr, "\t\tFile found (index=%i name=%s sep=%s)\n", addr, files.dict[addr].key, files.dict[addr].sep);
-							findToken(scriptLine, cursors);
-							int index = token2Num(vars, scriptLine, cursors);
-							fprintf(stderr, "\t\tIndex is %i\n", index);
-							int end;
-							char *string = loadFile(NULL, files.dict[addr], &end, index);
-
-							fprintf(stderr, "Will reallocate buff %p to len %i\n", buff, end + 1);
-							buff = realloc(buff, (end + 1) * sizeof(char));
-							fprintf(stderr, "\t\tNew buff is %p\n", buff);
-							for (int dest=len, source=0; source <= end; ++source, ++dest) {
-								fprintf(stderr, "\t\tCopying %c from file to dest[%i]\n", string[source], dest);
-								buff[dest] = string[source];
-							}
-							len += end;
-							fprintf(stderr, "\t\tSetting buff[%i] to 0\n", len);
-							buff[len]=0;
-							free(string);
-						}
-					}
-					else {  // variable
-						fprintf(stderr, "\t\tStatus is variable\n");
-						int end, sourceIndex = findVar(vars, scriptLine, cursors);
-						fprintf(stderr, "\t\tVariable found at %i\n", sourceIndex);
-						for (end=0; vars.dict[sourceIndex].val[end] != 0; ++end);
-						fprintf(stderr, "\t\tVariable length %s is %i\n", vars.dict[sourceIndex].val, end);
-						fprintf(stderr, "\t\tReallocating buff %p to %i\n", buff, len + end + 1);
-						buff = realloc(buff, (len + end + 1) * sizeof(char));
-						for (int dest=len, source=0; source < end; ++source, ++dest) {
-							fprintf(stderr, "\t\tCopying %c from var[%i] to dest[%i]\n", vars.dict[sourceIndex].val[source], sourceIndex, dest);
-							buff[dest] = vars.dict[sourceIndex].val[source];
-						}
-						len += end;
-						buff[len] = 0;
-					}
-				}
+			int status;
+			if (scriptLine[cursors[END]] == '-' || (status=findToken(scriptLine, cursors)) == ASSIGNMENT){
+				fprintf(stderr, "\t\tString mode\n");
+				findToken(scriptLine, cursors);
+				char *newVar = varStrAss(vars, seps, files, loops, scriptLine, cursors);
 				free(vars.dict[destIndex].val);
-				vars.dict[destIndex].val = buff;
+				vars.dict[destIndex].val = newVar;
 			}
-			else {
+			else if (status == MATHS){
+				fprintf(stderr, "\t\tMaths mode\n");
 				int result = string2Num(vars.dict[destIndex].val);
 				do {
 					switch(scriptLine[cursors[START]]){
@@ -730,6 +742,7 @@ int main(int argc, char **argv){
 				} while (findToken(scriptLine, cursors) != TERMINATOR);
 				num2String(vars.dict[destIndex].val, result);
 			}
+			else fprintf(stderr, "\t\tUnknown mode.\n"), exit(0);
 		}
 	}
 	
