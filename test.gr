@@ -1,13 +1,10 @@
-var num 
-num = 14
-print num "\n"
+var one
+one = "hey" 
 
-num ++
-print num "\n"
+var two
+two = "you"
 
-num --
-print num "\n"
+one = one " and " two
+print one "\n"
 
-num += 12 + 6 - 4 * 2
-print num "\n"
 

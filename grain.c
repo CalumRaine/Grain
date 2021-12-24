@@ -623,7 +623,45 @@ int main(int argc, char **argv){
 			findToken(scriptLine, cursors);
 			if (substringEquals("=", scriptLine, cursors)){
 				// assignment
-				if (findToken(scriptLine, cursors) == QUOTE){
+				char *buff = NULL;
+				int len = 0;
+				for (int status=findToken(scriptLine, cursors); status != TERMINATOR; status=findToken(scriptLine, cursors)){
+					if (status == QUOTE || scriptLine[cursors[START]] >= 48 && scriptLine[cursors[START]] <= 57){
+						fprintf(stderr, "\t\tStatus is %s\n", status == QUOTE ? "QUOTE" : "NUM");
+						fprintf(stderr, "\t\tWill reallocate buff %p to len %i\n", buff, len + cursors[END] - cursors[START] + 1);
+						buff = realloc(buff, (len + cursors[END] - cursors[START] + 1) * sizeof(char));
+						fprintf(stderr, "\t\tNew buff is %p\n", buff);
+						
+						for (int dest=len, source=cursors[START]; source < cursors[END]; ++source, ++dest) {
+							fprintf(stderr, "\t\tCopying %c from script[%i] to dest[%i]\n", scriptLine[source], source, dest);
+							buff[dest] = scriptLine[source];
+						}
+						len += cursors[END] - cursors[START];
+						fprintf(stderr, "\t\tSetting buff[%i] to 0\n", cursors[END] - cursors[START]);
+						buff[len] = 0;
+					}
+					else if (scriptLine[cursors[END]] == '['){
+
+					}
+					else {  // variable
+						fprintf(stderr, "\t\tStatus is variable\n");
+						int end, sourceIndex = findVar(vars, scriptLine, cursors);
+						fprintf(stderr, "\t\tVariable found at %i\n", sourceIndex);
+						for (end=0; vars.dict[sourceIndex].val[end] != 0; ++end);
+						fprintf(stderr, "\t\tVariable length %s is %i\n", vars.dict[sourceIndex].val, end);
+						fprintf(stderr, "\t\tReallocating buff %p to %i\n", buff, len + end + 1);
+						buff = realloc(buff, (len + end + 1) * sizeof(char));
+						for (int dest=len, source=0; source < end; ++source, ++dest) {
+							fprintf(stderr, "\t\tCopying %c from var[%i] to dest[%i]\n", vars.dict[sourceIndex].val[source], sourceIndex, dest);
+							buff[dest] = vars.dict[sourceIndex].val[source];
+						}
+						len += end;
+						buff[len] = 0;
+					}
+				}
+				free(vars.dict[destIndex].val);
+				vars.dict[destIndex].val = buff;
+				/*if (findToken(scriptLine, cursors) == QUOTE){
 					vars.dict[destIndex].val = substringSave(vars.dict[destIndex].val, scriptLine, cursors);
 					fprintf(stderr, "\t\tAssigning quote: '%s'\n\n", vars.dict[destIndex].val);
 				}
@@ -638,7 +676,7 @@ int main(int argc, char **argv){
 					int sourceIndex = findVar(vars, scriptLine, cursors);
 					fprintf(stderr, "\t\tAssigning val from %s : %s\n\n", vars.dict[sourceIndex].key, vars.dict[sourceIndex].val);
 					vars.dict[destIndex].val = stringSave(vars.dict[destIndex].val, vars.dict[sourceIndex].val);
-				}
+				}*/
 			}
 			else if (substringEquals("++", scriptLine, cursors)){
 				findToken(scriptLine, cursors);
