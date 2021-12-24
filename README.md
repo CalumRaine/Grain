@@ -20,23 +20,14 @@ sep component("-")
 
 in testFile
 	in line
-		print column[1]
-		print " " 
+		print column[1] " "
 		in column[2]
-			print initial
-			print "\n"
+			print initial "\n"
 		out
 
-		print "\t"
-		print column[3]
+		print "\t" column[3]
 		in column[4]
-			print " year="
-			print component[0]
-			print " month="
-			print component[1]
-			print " day="
-			print component[2]
-			print "\n"
+			print " year=" component[0] " month=" component[1] " day=" component[2] "\n"
 		out
 	out
 out
@@ -49,6 +40,18 @@ Kevin S
 Laura A
   dob: year=2001 month=04 day=17
 ```
+
+### To Do
+* If conditional statements
+* Check for redefinition of existing variables
+* Allow hierarchical printing (such as `print line[3].column[2]`)
+* Allow hierarchical looping (such as `in line[3].column`)
+* Allow variable concatenation, as implemented in print
+* Allow variable declaration and assignment in one 
+* Allow multiple comma-separated sep/file/var declarations
+* Allow stream editing by reassignment of sep/file (i.e. `column[2] = "hello"`)
+* Implement whitespace scanning for seps
+* Allow mathematical variable reassignment (such as `variable += 14`)
 
 ### Roadmap
 1. `var name = ""`
@@ -76,12 +79,12 @@ Laura A
         * Should the most recent definition be used?
         * Or only the definition within the current scope?
     * Future: allow regex expressions, such as [a-d], !/hello/ etc
-11. `scan [parent].[child].[grandchild]`
+11. `scan [parent].[child].[grandchild]` --- DEPRECATED by IN command
     * Initiaes a loop over `granchild` in `child` in `parent`
     * Any number of parent-child hierarchies are allowed
     * `parent` and `child` _must_ be a single entity, such as `col[0]` and not all columns
     * Future: possibly allow `parent` and `child` to be iterators too, i.e. nested loops declared on one line 
-13. `switch [parent]`
+13. `switch [parent]` ---- DEPRECATED by IN command
     * All subsequent child delimiters are in reference to this parent
     * Similar to `cd` in `BASH`
     * `print line[0].col[3] line[0].col[4]` == `switch line[0]; print col[3] col[4]`
