@@ -1,16 +1,13 @@
-file myFile("example.txt", "\n")
-sep col(" ")
-sep date("-")
+var num 
+num = 14
+print num "\n"
 
-in myFile
-	print col[1] "'s birth month is "
-	in col[4]
-		print date[1] "\n"
-	out
-out
+num ++
+print num "\n"
 
+num --
+print num "\n"
 
-
-
-
+num += 12 + 6 - 4 * 2
+print num "\n"
 
