@@ -382,7 +382,7 @@ int main(int argc, char **argv){
 								fprintf(stderr, " does not exist\n");
 								exit(0);
 							}
-							else if ( (stop = sepSearch(buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop)) == -1) stop = cursors[END];
+							else if ( (stop = sepSearch(buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop)) == -1) stop = loops.stack[loops.ptr].stop;
 							printSubstring(buff, start, stop);
 						}
 						else if ( (addr=findFile(files, scriptLine, cursors)) != -1 ){
@@ -641,7 +641,47 @@ int main(int argc, char **argv){
 						buff[len] = 0;
 					}
 					else if (scriptLine[cursors[END]] == '['){
+						fprintf(stderr, "\t\tIndex found.  Must be sep or file\n");
+						int addr;
+						if ( (addr=findSep(seps, scriptLine, cursors)) != -1 ) {
+							fprintf(stderr, "\t\tSep found (index=%i name=%s sep=%s)\n", addr, seps.dict[addr].key, seps.dict[addr].val);
+							findToken(scriptLine, cursors);
+							int index = token2Num(vars, scriptLine, cursors);
+							fprintf(stderr, "\t\tIndex is %i\n", index);
+							int stop, start = skipSep(loops.stack[loops.ptr].buff, seps.dict[addr], index, loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
+							if (start == -1) fprintf(stderr, " does not exist\n"), exit(0);
+							else if ( (stop = sepSearch(loops.stack[loops.ptr].buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop)) == -1) stop = loops.stack[loops.ptr].stop;
+							fprintf(stderr, "Will reallocate buff %p to len %i\n", buff, len + stop - start + 1);
+							buff = realloc(buff, (len + stop - start + 1) * sizeof(char));
+							fprintf(stderr, "\t\tNew buff is %p\n", buff);
+							for (int dest=len, source=start; source < stop; ++source, ++dest) {
+								fprintf(stderr, "\t\tCopying %c from loopStack to dest[%i]\n", loops.stack[loops.ptr].buff[source], dest);
+								buff[dest] = loops.stack[loops.ptr].buff[source];
+							}
+							len += stop - start;
+							fprintf(stderr, "\t\tSetting buff[%i] to 0\n", len);
+							buff[len] = 0;
+						}
+						else if ( (addr=findFile(files, scriptLine, cursors)) != -1 ){
+							fprintf(stderr, "\t\tFile found (index=%i name=%s sep=%s)\n", addr, files.dict[addr].key, files.dict[addr].sep);
+							findToken(scriptLine, cursors);
+							int index = token2Num(vars, scriptLine, cursors);
+							fprintf(stderr, "\t\tIndex is %i\n", index);
+							int end;
+							char *string = loadFile(NULL, files.dict[addr], &end, index);
 
+							fprintf(stderr, "Will reallocate buff %p to len %i\n", buff, end + 1);
+							buff = realloc(buff, (end + 1) * sizeof(char));
+							fprintf(stderr, "\t\tNew buff is %p\n", buff);
+							for (int dest=len, source=0; source <= end; ++source, ++dest) {
+								fprintf(stderr, "\t\tCopying %c from file to dest[%i]\n", string[source], dest);
+								buff[dest] = string[source];
+							}
+							len += end;
+							fprintf(stderr, "\t\tSetting buff[%i] to 0\n", len);
+							buff[len]=0;
+							free(string);
+						}
 					}
 					else {  // variable
 						fprintf(stderr, "\t\tStatus is variable\n");
@@ -661,30 +701,6 @@ int main(int argc, char **argv){
 				}
 				free(vars.dict[destIndex].val);
 				vars.dict[destIndex].val = buff;
-				/*if (findToken(scriptLine, cursors) == QUOTE){
-					vars.dict[destIndex].val = substringSave(vars.dict[destIndex].val, scriptLine, cursors);
-					fprintf(stderr, "\t\tAssigning quote: '%s'\n\n", vars.dict[destIndex].val);
-				}
-				else if (scriptLine[cursors[START]] >= 48 && scriptLine[cursors[START]] <= 57){
-					fprintf(stderr, "\t\tAssigning numerical value\n");
-					vars.dict[destIndex].val = substringSave(vars.dict[destIndex].val, scriptLine, cursors);
-					fprintf(stderr, "\t\tSaved value is %s\n", vars.dict[destIndex].val);
-				}
-				else {
-					// copying val from variable
-					fprintf(stderr, "\t\tAssigning variable val\n");
-					int sourceIndex = findVar(vars, scriptLine, cursors);
-					fprintf(stderr, "\t\tAssigning val from %s : %s\n\n", vars.dict[sourceIndex].key, vars.dict[sourceIndex].val);
-					vars.dict[destIndex].val = stringSave(vars.dict[destIndex].val, vars.dict[sourceIndex].val);
-				}*/
-			}
-			else if (substringEquals("++", scriptLine, cursors)){
-				findToken(scriptLine, cursors);
-				num2String(vars.dict[destIndex].val, token2Num(vars, scriptLine, cursors) + 1);
-			}
-			else if (substringEquals("--", scriptLine, cursors)){
-				findToken(scriptLine, cursors);
-				num2String(vars.dict[destIndex].val, token2Num(vars, scriptLine, cursors) -1);
 			}
 			else {
 				int result = string2Num(vars.dict[destIndex].val);
