@@ -4,9 +4,9 @@
 #define READ_SIZE 500
 #define SEP 1
 
-enum pos {START, END};
+enum pos {START, STOP};
 enum tokenType {TERMINATOR, QUOTE, VARIABLE, COMMA, ASSIGNMENT, MATHS};
-enum boolean {FALSE, TRUE};
+enum boolean {FALSE, TRUE, PENDING};
 
 struct fileDict {
 	char *key; // filename
@@ -45,6 +45,8 @@ struct loopStruct {
 	int type; 	// 0 = file; 1 = sep
 	int isLoop;	// 0 = false ; 1 = true
 	int addr;	// address offet to find relevant file/sep
+	int index;
+	int bounce;	// 0 =  false; 1 = true; 2 = pending
 	long cmd; 	// fseek to start of loop in script
 	char *buff;
 	int start;
@@ -57,23 +59,6 @@ struct loopStack {
 	struct loopStruct *stack;
 };
 
-char convertEscapeSequence(char escapeChar){
-	switch (escapeChar) {
-		case 'n':
-			return '\n';
-		case 't':
-			return '\t';
-		case '\\':
-			return '\\';
-		case '"':
-			return '"';
-		case '`':
-			return '`';
-		case '\'':
-			return '\'';
-	}
-}
-
 int findToken(char *txt, int *cursors){
 	/* Moves cursors around next token
 		* cursor[START] = 1st character (read from here)
@@ -85,10 +70,10 @@ int findToken(char *txt, int *cursors){
 		0 if find terminator
 		1 if find quotation.
 		2 if find word.
-	 * cursors[START] begins scanning from after cursors[END]
+	* cursors[START] begins scanning from after cursors[STOP]
 	* Escape characters automatically converted and removed from string */
 
-	cursors[START] = cursors[END] + 1;
+	cursors[START] = cursors[STOP] + 1;
 
 	// Skip whitespace
 	while (txt[cursors[START]] == ' ' || txt[cursors[START]] == '\t') ++cursors[START];
@@ -100,46 +85,46 @@ int findToken(char *txt, int *cursors){
 	case '\0':
 		return TERMINATOR;
 	case ',':
-		cursors[END] = cursors[START];
+		cursors[STOP] = cursors[START];
 		return COMMA;
 	case '=':
-		cursors[END] = cursors[START];
+		cursors[STOP] = cursors[START];
 		return ASSIGNMENT;
 	case '+':
 	case '-':
 	case '*':
 	case '/':
 	case '%':
-		cursors[END] = cursors[START];
+		cursors[STOP] = cursors[START];
 		return MATHS;
 	case '\'':
 	case '"':
 	case '`':
 		// Found quote.  Scan to matching quotation mark.
-		for (cursors[END] = cursors[START] + 1; txt[cursors[END]] != txt[cursors[START]] ; ++cursors[END]){
+		for (cursors[STOP] = cursors[START] + 1; txt[cursors[STOP]] != txt[cursors[START]] ; ++cursors[STOP]){
 			// Check for escape character
-			if (txt[cursors[END]] == '\\'){
+			if (txt[cursors[STOP]] == '\\'){
 				// Shuffle string left
-				for (int i=cursors[END], j=cursors[END]+1; txt[i]!=0; ++i, ++j) txt[i] = txt[j];
+				for (int i=cursors[STOP], j=cursors[STOP]+1; txt[i]!=0; ++i, ++j) txt[i] = txt[j];
 				// Convert escape character
-				switch (txt[cursors[END]]){
+				switch (txt[cursors[STOP]]){
 				case 'n':
-					txt[cursors[END]] = '\n';
+					txt[cursors[STOP]] = '\n';
 					break;
 				case 't':
-					txt[cursors[END]] = '\t';
+					txt[cursors[STOP]] = '\t';
 					break;
 				case '\\':
-					txt[cursors[END]] = '\\';
+					txt[cursors[STOP]] = '\\';
 					break;
 				case '\'':
-					txt[cursors[END]] = '\'';
+					txt[cursors[STOP]] = '\'';
 					break;
 				case '"':
-					txt[cursors[END]] = '"';
+					txt[cursors[STOP]] = '"';
 					break;
 				case '`':
-					txt[cursors[END]] = '`';
+					txt[cursors[STOP]] = '`';
 					break;
 				}
 			}
@@ -147,24 +132,25 @@ int findToken(char *txt, int *cursors){
 		++cursors[START];
 		return QUOTE;
 	default:
-		for (cursors[END] = cursors[START]+1; txt[cursors[END]] != ' ' 
-						   && txt[cursors[END]] != '\t' 
-						   && txt[cursors[END]] != '\n' 
-					           && txt[cursors[END]] != 0 
-					           && txt[cursors[END]] != '=' 
-						   && txt[cursors[END]] != ';'
-						   && txt[cursors[END]] != ','
-						   && txt[cursors[END]] != '('
-						   && txt[cursors[END]] != ')'
-						   && txt[cursors[END]] != '['
-						   && txt[cursors[END]] != ']' ; ++cursors[END]);
+		for (cursors[STOP] = cursors[START]+1; txt[cursors[STOP]] != ' ' 
+						   && txt[cursors[STOP]] != '\t' 
+						   && txt[cursors[STOP]] != '\n' 
+					           && txt[cursors[STOP]] != 0 
+					           && txt[cursors[STOP]] != '=' 
+						   && txt[cursors[STOP]] != ';'
+						   && txt[cursors[STOP]] != ','
+						   && txt[cursors[STOP]] != '.'
+						   && txt[cursors[STOP]] != '('
+						   && txt[cursors[STOP]] != ')'
+						   && txt[cursors[STOP]] != '['
+						   && txt[cursors[STOP]] != ']' ; ++cursors[STOP]);
 		return VARIABLE;
 	}
 }
 
 int substringEquals(char *comp, char *txt, int *cursors){
-	// Scans txt from cursors[START] to cursors[END] until character doesn't match comp string
-	for (int compPos=0, txtPos=cursors[START]; txtPos < cursors[END]; ++compPos, ++txtPos) if (comp[compPos] != txt[txtPos]) return 0;
+	// Scans txt from cursors[START] to cursors[STOP] until character doesn't match comp string
+	for (int compPos=0, txtPos=cursors[START]; txtPos < cursors[STOP]; ++compPos, ++txtPos) if (comp[compPos] != txt[txtPos]) return 0;
 	return 1;
 }
 
@@ -175,13 +161,13 @@ int stringEquals(char *comp, char *txt){
 }
 
 char *substringSave(char *dest, char *source, int *cursors){
-	// Reallocate memory in dest for source string from cursors[START] up to (not including) cursors[END]
-	// Copies source string to dest string from cursors[START] up to (not including) cursors[END]
+	// Reallocate memory in dest for source string from cursors[START] up to (not including) cursors[STOP]
+	// Copies source string to dest string from cursors[START] up to (not including) cursors[STOP]
 	// Returns newly allocated dest address
 
-	dest = realloc(dest, (1 + cursors[END] - cursors[START]) * sizeof(char));
-	dest[cursors[END]-cursors[START]] = 0;
-	for (int destPos=0; cursors[START] < cursors[END]; ++cursors[START], ++destPos) dest[destPos] = source[cursors[START]]; 
+	dest = realloc(dest, (1 + cursors[STOP] - cursors[START]) * sizeof(char));
+	dest[cursors[STOP]-cursors[START]] = 0;
+	for (int destPos=0; cursors[START] < cursors[STOP]; ++cursors[START], ++destPos) dest[destPos] = source[cursors[START]]; 
 	return dest;
 }
 
@@ -219,18 +205,18 @@ int findSep(struct sepStruct seps, char *txt, int *cursors){
 	return -1;
 }
 
-int substring2Num(char *txt, int *cursors){
+int substring2Int(char *txt, int *cursors){
 	fprintf(stderr, "\t\t\tSUBSTRING2NUM called\n");
 	// Converts string in txt to integer
 	int result = 0;
-	for (int i=cursors[START]; i < cursors[END]; ++i){
+	for (int i=cursors[START]; i < cursors[STOP]; ++i){
 		result *= 10;
 		result += (int)(txt[i] - 48);
 	}
 	return result;
 }
 
-int string2Num(char *txt){
+int string2Int(char *txt){
 	fprintf(stderr, "\t\t\tSTRING2NUM called on: %s\n", txt);
 	// Converts string to integer
 	int result=0;
@@ -241,8 +227,8 @@ int string2Num(char *txt){
 	return result;
 }
 
-int sepSearch(char *txt, char *sep, int start, int stop){
-	fprintf(stderr, "\t\t\tSEPSEARCH called\n");
+int loadSepStop(char *txt, char *sep, int start, int stop){
+	fprintf(stderr, "\t\t\tLOADSEPSTOP called\n");
 	fprintf(stderr, "\t\t\tFind %s\n", sep);
 	fprintf(stderr, "\t\t\tBetween %i and %i\n", start, stop);
 	for (int i=start, j; i < stop; ++i){
@@ -256,9 +242,9 @@ int sepSearch(char *txt, char *sep, int start, int stop){
 	return -1;
 }
 
-int skipSep(char *txt, struct sepDict sep, int index, int cursor, int to){
-	fprintf(stderr, "\t\t\tSKIPSEP called: index %i cursor %i to %i\n", index, cursor, to);
-	while (index-- && (cursor = sepSearch(txt, sep.val, cursor, to)) != 1) cursor += sep.len;
+int loadSepStart(char *txt, struct sepDict sep, int index, int cursor, int to){
+	fprintf(stderr, "\t\t\tLOADSEPSTART called: index %i cursor %i to %i\n", index, cursor, to);
+	while (index-- && (cursor = loadSepStop(txt, sep.val, cursor, to)) != 1) cursor += sep.len;
 	fprintf(stderr, "\t\t\tReturning %i\n", cursor);
 	return cursor;
 }
@@ -274,7 +260,7 @@ char *loadFile(char *buff, struct fileDict file, int *length, int index){
 			buff = realloc(buff, (buffCap+1) * sizeof(char));
 			read = fread(&buff[lastCap], sizeof(char), READ_SIZE, file.fp);
 			fprintf(stderr, "\t\t\tlastCap %i buffCap %i read %i\n", lastCap, buffCap, read);
-		} while ( (end=sepSearch(buff, file.sep, lastCap, lastCap+read)) == -1  &&  read == READ_SIZE);
+		} while ( (end=loadSepStop(buff, file.sep, lastCap, lastCap+read)) == -1  &&  read == READ_SIZE);
 
 		if (end != -1) fseek(file.fp, (long)(0 - read + end + file.len), SEEK_CUR);
 	}
@@ -301,7 +287,7 @@ int breakFun(struct loopStruct loop, char *scriptLine, FILE *scriptFile){
 	int cursors[2];
 	for (int loopCount=1; loopCount; ){
 		fgets(scriptLine, READ_SIZE + 1, scriptFile);
-		cursors[END] = -1;
+		cursors[STOP] = -1;
 		findToken(scriptLine, cursors);
 		if (substringEquals("in", scriptLine, cursors)) fprintf(stderr, "\t\t\tFound 'in', inc loop count\n"), ++loopCount;
 		else if (substringEquals("out", scriptLine, cursors)) fprintf(stderr, "\t\t\tFound 'out', dec loop count\n"), --loopCount;
@@ -318,9 +304,9 @@ void printSubstring(char *txt, int start, int stop){
 	txt[stop] = swap;
 }
 
-int token2Num(struct varStruct vars, char *txt, int *cursors){
+int token2Int(struct varStruct vars, char *txt, int *cursors){
 	fprintf(stderr, "\t\t\tTOKEN2NUM called\n");
-	return txt[cursors[START]] >= 48 && txt[cursors[START]] <= 57 ? substring2Num(txt, cursors) : string2Num(vars.dict[findVar(vars, txt, cursors)].val);
+	return txt[cursors[START]] >= 48 && txt[cursors[START]] <= 57 ? substring2Int(txt, cursors) : string2Int(vars.dict[findVar(vars, txt, cursors)].val);
 }
 
 char *num2String(char *txt, int num){
@@ -379,22 +365,22 @@ char *stringJoin(char *dest, char *src){
 char *varStrAss(struct varStruct vars, struct sepStruct seps, struct fileStruct files, struct loopStack loops, char *scriptLine, int *cursors){
 	fprintf(stderr, "\t\t\tVARSTRASS called\n");
 	char *buff = NULL;
-	for (int status=findToken(scriptLine, cursors), addr, start, stop; status != TERMINATOR && status != COMMA; status=findToken(scriptLine, cursors)){
+	for (int status=findToken(scriptLine, cursors), addr, start, stop; status != TERMINATOR && status != COMMA; status = scriptLine[cursors[STOP]] == ',' ? COMMA : findToken(scriptLine, cursors)){
 		if (status == QUOTE || scriptLine[cursors[START]] >= 48 && scriptLine[cursors[START]] <= 57){
 			fprintf(stderr, "\t\t\t%s detected\n", status == QUOTE? "QUOTE" : "NUMBER");
-			buff = substringJoin(buff, scriptLine, cursors[START], cursors[END]);
+			buff = substringJoin(buff, scriptLine, cursors[START], cursors[STOP]);
 		}
-		else if (scriptLine[cursors[END]] == '['){
+		else if (scriptLine[cursors[STOP]] == '['){
 			if ( (addr=findSep(seps, scriptLine, cursors)) != -1 ) {
 				findToken(scriptLine, cursors);
-				start = skipSep(loops.stack[loops.ptr].buff, seps.dict[addr], token2Num(vars, scriptLine, cursors), loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
+				start = loadSepStart(loops.stack[loops.ptr].buff, seps.dict[addr], token2Int(vars, scriptLine, cursors), loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
 				if (start == -1) fprintf(stderr, " does not exist\n"), exit(0);
-				else if ( (stop = sepSearch(loops.stack[loops.ptr].buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop)) == -1) stop = loops.stack[loops.ptr].stop;
+				else if ( (stop = loadSepStop(loops.stack[loops.ptr].buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop)) == -1) stop = loops.stack[loops.ptr].stop;
 				buff = substringJoin(buff, loops.stack[loops.ptr].buff, start, stop);
 			}
 			else if ( (addr=findFile(files, scriptLine, cursors)) != -1 ){
 				findToken(scriptLine, cursors);
-				char *string = loadFile(NULL, files.dict[addr], &start, token2Num(vars, scriptLine, cursors));
+				char *string = loadFile(NULL, files.dict[addr], &start, token2Int(vars, scriptLine, cursors));
 				buff = stringJoin(buff, string);
 				free(string);
 			}
@@ -403,10 +389,129 @@ char *varStrAss(struct varStruct vars, struct sepStruct seps, struct fileStruct 
 			fprintf(stderr, "\t\t\tVariable detected\n");
 			buff = stringJoin(buff, vars.dict[findVar(vars, scriptLine, cursors)].val);
 		}
-
-		if (scriptLine[cursors[END]] == ',') break;
 	}
 	return buff;
+}
+
+struct loopStack loadLoop(struct loopStack loops, struct sepStruct seps, struct fileStruct files, char *scriptLine, FILE *scriptFile);
+struct loopStack resetLoop(struct loopStack loops, struct sepStruct seps, struct fileStruct files, char *scriptLine, FILE *scriptFile){
+	fprintf(stderr, "\t\tRESETLOOP called\n");
+	struct loopStruct *loop = &loops.stack[loops.ptr];
+	struct loopStruct *parent = &loops.stack[loops.ptr-1];
+	fprintf(stderr, "\t\tLoop ptr %i ; bounce %i ; type %i; index %i\n", loops.ptr, loop->bounce, loop->type, loop->index);
+	loop->buff = parent->buff;
+	loop->start = loop->index == -1 ? parent->start : loadSepStart(loop->buff, seps.dict[loop->addr], loop->index, parent->start, parent->stop);
+
+	if (loop->start == -1){
+		fprintf(stderr, "\t\tStart not found.  Calling loadLoop\n\n");
+		loops.ptr -= breakFun(*loop, scriptLine, scriptFile);
+		return loadLoop(loops, seps, files, scriptLine, scriptFile);
+	}
+	else if ( (loop->stop = loadSepStop(loop->buff, seps.dict[loop->addr].val, loop->start, parent->stop)) == -1){
+		fprintf(stderr, "\t\tEnd not found.  Searching full parent buffer.\n");
+		loop->stop = parent->stop;
+	}
+
+	if (loop->bounce == TRUE){
+		fprintf(stderr, "\t\tLoop->bounce is true.  Bouncing up resetLoop\n\n");
+		++loops.ptr;
+		return resetLoop(loops, seps, files, scriptLine, scriptFile);
+	}
+	else if (loop->bounce == PENDING) {
+		fprintf(stderr, "\t\tPending status --> False\n\n");
+		loop->bounce = FALSE;
+	}
+
+	fprintf(stderr, "\t\tloop->bounce FALSE.  Returning loops\n\n");
+	return loops;
+}
+
+struct loopStack loadLoop(struct loopStack loops, struct sepStruct seps, struct fileStruct files, char *scriptLine, FILE *scriptFile){
+	// BUG
+	// If coming up, need to load from start=0
+	// If coming down, need to load next
+
+	// have startLoop, loadLoop and resetLoop ?
+	// use resetLoop when moving upwards
+	// use loadLoop when getting next or moving down
+	// use startLoop on IN command 
+
+	fprintf(stderr, "\t\tLOADLOOPCALLED\n");
+	struct loopStruct *loop = &loops.stack[loops.ptr];
+	struct loopStruct *parent = &loops.stack[loops.ptr-1];
+	fprintf(stderr, "\t\tLoop ptr %i ; bounce %i ; type %i; index %i\n", loops.ptr, loop->bounce, loop->type, loop->index);
+	if (loops.ptr == -1) return loops;
+	else if (loop->isLoop == FALSE) {
+		fprintf(stderr, "\t\tLoop[%i].isLoop = FALSE.  Breaking out of loop\n", loops.ptr);
+		// ----
+		if (loop->bounce == FALSE) fprintf(stderr, "\t\tLoop[%i]->bounce from 0 to 2\n", loops.ptr), loop->bounce = PENDING;
+		else fprintf(stderr, "\t\tLoop[%i]->bounce = %i\n", loops.ptr, loop->bounce);
+		fprintf(stderr, "\t\tLoops.ptr from %i to %i\n\n", loops.ptr, loops.ptr-1);
+		--loops.ptr;
+		return loadLoop(loops, seps, files, scriptLine, scriptFile);
+		// ----
+	}
+	else if (loop->type == SEP){
+		fprintf(stderr, "\t\tLoop type = SEP\n");
+		loop->start = loop->stop + seps.dict[loop->addr].len;
+		if (loop->start > parent->stop) {
+			fprintf(stderr, "\t\tEnd of buffer found\n");
+			// ----
+			if (loop->bounce == FALSE) fprintf(stderr, "\t\tLoop[%i]->bounce from 0 to 2\n", loops.ptr), loop->bounce = PENDING;
+			else fprintf(stderr, "\t\tLoop[%i]->bounce = %i\n", loops.ptr, loop->bounce);
+			fprintf(stderr, "\t\tLoops.ptr from %i to %i\n\n", loops.ptr, loops.ptr-1);
+			--loops.ptr;
+			return loadLoop(loops, seps, files, scriptLine, scriptFile);
+			// ----
+		}
+		else if ( (loop->stop = loadSepStop(loop->buff, seps.dict[loop->addr].val, loop->start, parent->stop)) == -1) {
+			fprintf(stderr, "\t\tSep not found, scan to end of parent\n");
+			fprintf(stderr, "\t\tReturning to beginning of loop\n");
+			loop->stop = parent->stop;
+			fseek(scriptFile, loop->cmd, SEEK_SET);
+			if (loop->bounce == PENDING) fprintf(stderr, "\t\tLoop[%i].bounce from 2 to 0\n\n", loops.ptr), loop->bounce = FALSE;
+			else if (loop->bounce == TRUE) {
+				fprintf(stderr, "\t\tLoop[%i].bounce is %i.  ++Loops.ptr\n", loops.ptr, loop->bounce);
+				++loops.ptr;
+				return resetLoop(loops, seps, files, scriptLine, scriptFile);
+			}
+			return loops;
+		}
+		else {
+			fprintf(stderr, "\t\tSep found.  Scanning from %i to %i\n", loop->start, loop->stop);
+			fprintf(stderr, "\t\tReturning to beginning of loop\n");
+			fseek(scriptFile, loop->cmd, SEEK_SET);
+			if (loop->bounce == PENDING) fprintf(stderr, "\t\tLoop[%i].bounce from 2 to 0\n\n", loops.ptr), loop->bounce = FALSE;
+			else if (loop->bounce == TRUE) {
+				fprintf(stderr, "\t\tLoop[%i].bounce is %i.  ++Loops.ptr\n\n", loops.ptr, loop->bounce);
+				++loops.ptr;
+				return resetLoop(loops, seps, files, scriptLine, scriptFile);
+			}
+			return loops;
+		}
+	}
+	else if ( (loop->buff = loadFile(loop->buff, files.dict[loop->addr], &loop->stop, 0)) == NULL) {
+		fprintf(stderr, "\t\tloop type = file\n");
+		fprintf(stderr, "\t\tfound end of file\n");
+		free(loop->buff);
+		--loops.ptr;
+		if (loop->bounce == FALSE) fprintf(stderr, "\t\tLoop[%i]->bounce from 0 to 2\n", loops.ptr), loop->bounce = PENDING;
+		else fprintf(stderr, "\t\tLoop[%i]->bounce = %i\n", loops.ptr, loop->bounce);
+		fprintf(stderr, "\n");
+		return loadLoop(loops, seps, files, scriptLine, scriptFile);
+	}
+	else {
+		fprintf(stderr, "\t\tloop type = file\n");
+		fprintf(stderr, "\t\tReturning to beginning of loop\n");
+		fseek(scriptFile, loop->cmd, SEEK_SET);
+		if (loop->bounce == PENDING) fprintf(stderr, "\t\tLoop[%i].bounce from 2 to 0\n\n", loops.ptr), loop->bounce = FALSE;
+		else if (loop->bounce == TRUE) {
+			fprintf(stderr, "\t\tLoop[%i].bounce is %i.  ++Loops.ptr\n\n", loops.ptr, loop->bounce);
+			++loops.ptr;
+			return resetLoop(loops, seps, files, scriptLine, scriptFile);
+		}
+		return loops;
+	}
 }
 
 int main(int argc, char **argv){
@@ -434,11 +539,11 @@ int main(int argc, char **argv){
 				var->key = substringSave(var->key, scriptLine, cursors);
 				fprintf(stderr, "\t\t%s declared\n\n", var->key);
 				++vars.count;
-				if (scriptLine[cursors[END]] == '=' || scriptLine[cursors[END]] != ',' && findToken(scriptLine, cursors) == ASSIGNMENT){
+				if (scriptLine[cursors[STOP]] == '=' || scriptLine[cursors[STOP]] != ',' && findToken(scriptLine, cursors) == ASSIGNMENT){
 					fprintf(stderr, "\t\tVariable declaration\n");
 					var->val = varStrAss(vars, seps, files, loops, scriptLine, cursors);
 				}
-			} while (scriptLine[cursors[START]] == ',' || scriptLine[cursors[END]] == ',');
+			} while (scriptLine[cursors[START]] == ',' || scriptLine[cursors[STOP]] == ',');
 		}
 		else if (substringEquals("print", scriptLine, cursors)){
 			fprintf(stderr, "\t\tPRINT command\n");
@@ -455,39 +560,39 @@ int main(int argc, char **argv){
 				case VARIABLE:
 					fprintf(stderr, "\t\tPrint variable or sep or file\n");
 					int addr;
-					if (scriptLine[cursors[END]] == '['){
+					if (scriptLine[cursors[STOP]] == '['){
 						fprintf(stderr, "\t\tIndex provided.  Must be sep or file\n");
 						if ( (addr=findSep(seps, scriptLine, cursors)) != -1 ) {
 							fprintf(stderr, "\t\tSep found (index=%i name=%s sep=%s)\n", addr, seps.dict[addr].key, seps.dict[addr].val);
 							findToken(scriptLine, cursors);
-							int index = token2Num(vars, scriptLine, cursors);
+							int index = token2Int(vars, scriptLine, cursors);
 							fprintf(stderr, "\t\tIndex is %i\n", index);
 							char *buff = loops.stack[loops.ptr].buff;
-							int stop, start = skipSep(buff, seps.dict[addr], index, loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
+							int stop, start = loadSepStart(buff, seps.dict[addr], index, loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
 							if (start == -1){
 								fprintf(stderr, " does not exist\n");
 								exit(0);
 							}
-							else if ( (stop = sepSearch(buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop)) == -1) stop = loops.stack[loops.ptr].stop;
+							else if ( (stop = loadSepStop(buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop)) == -1) stop = loops.stack[loops.ptr].stop;
 							printSubstring(buff, start, stop);
 						}
 						else if ( (addr=findFile(files, scriptLine, cursors)) != -1 ){
 							fprintf(stderr, "\t\tFile found (index=%i name=%s sep=%s)\n", addr, files.dict[addr].key, files.dict[addr].sep);
 							findToken(scriptLine, cursors);
-							int index = token2Num(vars, scriptLine, cursors);
+							int index = token2Int(vars, scriptLine, cursors);
 							fprintf(stderr, "\t\tIndex is %i\n", index);
 							char *string = loadFile(NULL, files.dict[addr], &index, index); // &index is naughty
 							printf("%s\n", string);
 							free(string);
 						}
 						else {
-							printSubstring(scriptLine, cursors[START], cursors[END]);
+							printSubstring(scriptLine, cursors[START], cursors[STOP]);
 							fprintf(stderr, " does not exist\n");
 							exit(0);
 						}
 					}
 					else if ( (addr=findVar(vars, scriptLine, cursors)) == -1) {
-						printSubstring(scriptLine, cursors[START], cursors[END]);
+						printSubstring(scriptLine, cursors[START], cursors[STOP]);
 						fprintf(stderr, " does not exist\n");
 						exit(0);
 					}
@@ -498,7 +603,7 @@ int main(int argc, char **argv){
 					break;
 				case QUOTE:
 					fprintf(stderr, "\t\tPrint quotation\n\n");
-					printSubstring(scriptLine, cursors[START], cursors[END]);
+					printSubstring(scriptLine, cursors[START], cursors[STOP]);
 					break;
 				}
 			} while (status != TERMINATOR);
@@ -517,10 +622,10 @@ int main(int argc, char **argv){
 			// Get filename
 			if (findToken(scriptLine, cursors) == QUOTE) {
 				fprintf(stderr, "\t\tFilename = quote\n");
-				char swap = scriptLine[cursors[END]];
-				scriptLine[cursors[END]] = 0;
+				char swap = scriptLine[cursors[STOP]];
+				scriptLine[cursors[STOP]] = 0;
 				file->fp = fopen(&scriptLine[cursors[START]], "r");
-				scriptLine[cursors[END]] = swap;
+				scriptLine[cursors[STOP]] = swap;
 			}
 			else {
 				fprintf(stderr, "\t\tFilename = variable\n");
@@ -532,7 +637,7 @@ int main(int argc, char **argv){
 				fprintf(stderr, "\t\tSeparator provided\n");
 				if (findToken(scriptLine, cursors) == QUOTE) {
 					fprintf(stderr, "\t\tSeparator = quote\n");
-					file->len = cursors[END] - cursors[START];
+					file->len = cursors[STOP] - cursors[START];
 					file->sep = substringSave(file->sep, scriptLine, cursors);
 				}
 				else {
@@ -566,7 +671,7 @@ int main(int argc, char **argv){
 
 			// Get separator
 			if (findToken(scriptLine, cursors) == QUOTE) {
-				if (cursors[START] == cursors[END]){
+				if (cursors[START] == cursors[STOP]){
 					fprintf(stderr, "\t\tSeparator = empty (treat characters individually)\n");
 					sep->val = malloc(sizeof(char));
 					sep->val[0] = 0;
@@ -574,7 +679,7 @@ int main(int argc, char **argv){
 				}
 				else {
 					fprintf(stderr, "\t\tSeparator = quote\n");
-					sep->len = cursors[END] - cursors[START];
+					sep->len = cursors[STOP] - cursors[START];
 					sep->val = substringSave(sep->val, scriptLine, cursors);
 				}
 			}
@@ -590,123 +695,151 @@ int main(int argc, char **argv){
 			++seps.count;
 		}
 		else if (substringEquals("in", scriptLine, cursors)){
-			fprintf(stderr, "\t\tIN command\n");
-			++loops.ptr;
-			if (loops.ptr == loops.cap){
-				++loops.cap;
-				fprintf(stderr, "\t\tAdding loop %i/%i to stack\n", loops.ptr, loops.cap);
-				loops.stack = realloc(loops.stack, loops.cap * sizeof(struct loopStruct));
-			}
-			else fprintf(stderr, "\t\tUsing loop %i/%i of stack\n", loops.ptr, loops.cap);
+			do {
+				fprintf(stderr, "\t\tIN command\n");
+				++loops.ptr;
+				if (loops.ptr == loops.cap){
+					++loops.cap;
+					fprintf(stderr, "\t\tAdding loop %i/%i to stack\n", loops.ptr, loops.cap);
+					loops.stack = realloc(loops.stack, loops.cap * sizeof(struct loopStruct));
+				}
+				else fprintf(stderr, "\t\tUsing loop %i/%i of stack\n", loops.ptr, loops.cap);
 
-			struct loopStruct *loop = &loops.stack[loops.ptr];
+				struct loopStruct *loop = &loops.stack[loops.ptr];
 
-			// Save cmd
-			loop->cmd = ftell(scriptFile);
+				// Save cmd
+				loop->cmd = ftell(scriptFile);
 
-			// Get type and addr
-			findToken(scriptLine, cursors);
-			loop->addr = findFile(files, scriptLine, cursors);
-			if ( loop->type = (loop->addr == -1) ) {
-				loop->addr = findSep(seps, scriptLine, cursors);
-				fprintf(stderr, "\t\tLoop type = sep (index=%i name=%s sep=%s)\n", loop->addr, seps.dict[loop->addr].key, seps.dict[loop->addr].val);
-			}
-			else fprintf(stderr, "\t\tLoop type = file (%i %s %s)\n", loop->addr, files.dict[loop->addr].key, files.dict[loop->addr].sep);
-
-			// Get index
-			int index;
-			if (scriptLine[cursors[END]] == '['){
-				fprintf(stderr, "\t\tIndex is provided\n");
-				loop->isLoop = FALSE;
+				// Get type and addr
 				findToken(scriptLine, cursors);
-				index = token2Num(vars, scriptLine, cursors);
-				fprintf(stderr, "\t\tIndex is %i\n", index);
-			}
-			else {
-				fprintf(stderr, "\t\tNo index provided\n");
-				index = 0;
-				loop->isLoop = TRUE;
-			}
-
-			// Load SEP
-			if (loop->type == SEP){
-				fprintf(stderr, "\t\tLoop type = SEP\n");
-				struct loopStruct parent = loops.stack[loops.ptr-1];
-				loop->buff = parent.buff;
-				fprintf(stderr, "\t\tLoop buff = %p\n", loop->buff);
-
-				// This is bad code
-				loop->start = index ? skipSep(loop->buff, seps.dict[loop->addr], index, parent.start, parent.stop) : parent.start;
-				if (loop->start != -1 && (loop->stop = sepSearch(loop->buff, seps.dict[loop->addr].val, loop->start, parent.stop)) == -1){
-					fprintf(stderr, "\t\tSep not found.  Scanning to end of parent buffer\n\n");
-					loop->stop = parent.stop;
+				loop->addr = findFile(files, scriptLine, cursors);
+				if ( loop->type = (loop->addr == -1) ) {
+					loop->addr = findSep(seps, scriptLine, cursors);
+					fprintf(stderr, "\t\tLoop type = sep (index=%i name=%s sep=%s)\n", loop->addr, seps.dict[loop->addr].key, seps.dict[loop->addr].val);
 				}
-				else if (loop->start == -1){
-					fprintf(stderr, "\t\tEnd of buffer found\n\n");
-					loops.ptr -= breakFun(*loop, scriptLine, scriptFile);
-				}
-			}
-			// Load FILE
-			else {
-				fprintf(stderr, "\t\tLoading file\n");
-				loop->buff = loadFile(NULL, files.dict[loop->addr], &loop->stop, index);
+				else fprintf(stderr, "\t\tLoop type = file (%i %s %s)\n", loop->addr, files.dict[loop->addr].key, files.dict[loop->addr].sep);
 
-				if (loop->buff == NULL){
-					fprintf(stderr, "\t\tEnd of file found\n\n");
-					loops.ptr -= breakFun(*loop, scriptLine, scriptFile);
+				// Get index
+				int index;
+				if (scriptLine[cursors[STOP]] == '['){
+					fprintf(stderr, "\t\tIndex is provided\n");
+					loop->isLoop = FALSE;
+					findToken(scriptLine, cursors);
+					loop->index = token2Int(vars, scriptLine, cursors);
+					fprintf(stderr, "\t\tIndex is %i\n", loop->index);
 				}
 				else {
-					loop->start = 0;
-					fprintf(stderr, "\t\tBuffer %p length is %i\n\n", loop->buff, loop->stop);
+					fprintf(stderr, "\t\tNo index provided\n");
+					loop->isLoop = TRUE;
+					loop->index = loop->type == SEP? -1 : 0;
 				}
+
+				// Load SEP
+				if (loop->type == SEP){
+					fprintf(stderr, "\t\tLoop type = SEP\n");
+					struct loopStruct parent = loops.stack[loops.ptr-1];
+					loop->buff = parent.buff;
+					fprintf(stderr, "\t\tLoop buff = %p\n", loop->buff);
+
+					// This is bad code
+					loop->start = loop->index == -1 ? parent.start : loadSepStart(loop->buff, seps.dict[loop->addr], loop->index, parent.start, parent.stop);
+					if (loop->start != -1 && (loop->stop = loadSepStop(loop->buff, seps.dict[loop->addr].val, loop->start, parent.stop)) == -1){
+						fprintf(stderr, "\t\tSep not found.  Scanning to end of parent buffer\n\n");
+						loop->stop = parent.stop;
+					}
+					else if (loop->start == -1){
+						fprintf(stderr, "\t\tEnd of buffer found\n\n");
+						loops.ptr -= breakFun(*loop, scriptLine, scriptFile);
+					}
+				}
+				// Load FILE
+				else {
+					fprintf(stderr, "\t\tLoading file\n");
+					loop->buff = loadFile(NULL, files.dict[loop->addr], &loop->stop, loop->index);
+
+					if (loop->buff == NULL){
+						fprintf(stderr, "\t\tEnd of file found\n\n");
+						loops.ptr -= breakFun(*loop, scriptLine, scriptFile);
+					}
+					else {
+						loop->start = 0;
+						fprintf(stderr, "\t\tBuffer %p length is %i\n\n", loop->buff, loop->stop);
+					}
+				}
+			} while ( loops.stack[loops.ptr].bounce = (scriptLine[cursors[STOP]] == '.') );
+			fprintf(stderr, "\t\tLoop stack generated:\n");
+			for (int l=0; l<=loops.ptr; ++l){
+				fprintf(stderr, "\t\t\t%i: bounce=%i type=%i\n", l, loops.stack[l].bounce, loops.stack[l].type);
 			}
 		}
 		else if (substringEquals("out", scriptLine, cursors) || substringEquals("cont", scriptLine, cursors)){
 			fprintf(stderr, "\t\tOUT comand\n");
-			struct loopStruct *loop = &loops.stack[loops.ptr];
-			if (loop->isLoop == FALSE) {
-				fprintf(stderr, "\t\tisLoop = FALSE.  Breaking out of loop\n\n");
-				--loops.ptr;
-			}
-			else if (loop->type == SEP){
-				fprintf(stderr, "\t\tLoop type = SEP\n");
-				int parentStop = loops.stack[loops.ptr-1].stop;
-				loop->start = loop->stop + seps.dict[loop->addr].len;
-				if (loop->start > parentStop) {
-					fprintf(stderr, "\t\tEnd of buffer found\n");
+			loops = loadLoop(loops, seps, files, scriptLine, scriptFile);
+			/*do {
+				struct loopStruct *loop = &loops.stack[loops.ptr];
+				fprintf(stderr, "\t\tLoop ptr %i ; bounce %i ; type %i\n", loops.ptr, loop->bounce, loop->type);
+				if (loop->isLoop == FALSE && loop->bounce != 2) {
+					fprintf(stderr, "\t\tLoop[%i].isLoop = FALSE.  Breaking out of loop\n", loops.ptr);
+					if (loop->bounce == 0) fprintf(stderr, "\t\tLoop[%i]->bounce from 0 to 2\n", loops.ptr), loop->bounce = 2;
+					else fprintf(stderr, "\t\tLoop[%i]->bounce = %i\n", loops.ptr, loop->bounce);
+					fprintf(stderr, "\t\tLoops.ptr from %i to %i\n\n", loops.ptr, loops.ptr-1);
 					--loops.ptr;
 				}
-				else if ( (loop->stop = sepSearch(loop->buff, seps.dict[loop->addr].val, loop->start, parentStop)) == -1) {
-					fprintf(stderr, "\t\tSep not found, scan to end of parent\n");
-					fprintf(stderr, "\t\tReturning to beginning of loop\n\n");
-					loop->stop = parentStop;
-					fseek(scriptFile, loop->cmd, SEEK_SET);
+				else if (loop->type == SEP){
+					fprintf(stderr, "\t\tLoop type = SEP\n");
+					int parentStop = loops.stack[loops.ptr-1].stop;
+					loop->start = loop->stop + seps.dict[loop->addr].len;
+					if (loop->start > parentStop) {
+						fprintf(stderr, "\t\tEnd of buffer found\n");
+						if (loop->bounce == 0) fprintf(stderr, "\t\tLoop[%i]->bounce from 0 to 2\n", loops.ptr), loop->bounce = 2;
+						else fprintf(stderr, "\t\tLoop[%i]->bounce = %i\n", loops.ptr, loop->bounce);
+						fprintf(stderr, "\t\tLoops.ptr from %i to %i\n\n", loops.ptr, loops.ptr-1);
+						--loops.ptr;
+					}
+					else if ( (loop->stop = loadSepStop(loop->buff, seps.dict[loop->addr].val, loop->start, parentStop)) == -1) {
+						fprintf(stderr, "\t\tSep not found, scan to end of parent\n");
+						fprintf(stderr, "\t\tReturning to beginning of loop\n");
+						loop->stop = parentStop;
+						fseek(scriptFile, loop->cmd, SEEK_SET);
+						if (loop->bounce == 2) fprintf(stderr, "\t\tLoop[%i].bounce from 2 to 0\n", loops.ptr), loop->bounce = 0;
+						else if (loop->bounce == 1) fprintf(stderr, "\t\tLoop[%i].bounce is %i.  ++Loops.ptr\n", loops.ptr, loop->bounce), ++loops.ptr;
+						fprintf(stderr, "\n");
+					}
+					else {
+						fprintf(stderr, "\t\tSep found.  Scanning from %i to %i\n", loop->start, loop->stop);
+						fprintf(stderr, "\t\tReturning to beginning of loop\n");
+						fseek(scriptFile, loop->cmd, SEEK_SET);
+						if (loop->bounce == 2) fprintf(stderr, "\t\tLoop[%i].bounce from 2 to 0\n", loops.ptr), loop->bounce = 0;
+						else if (loop->bounce == 1) fprintf(stderr, "\t\tLoop[%i].bounce is %i.  ++Loops.ptr\n", loops.ptr, loop->bounce), ++loops.ptr;
+						fprintf(stderr, "\n");
+					}
+
+				}
+				else if ( (loop->buff = loadFile(loop->buff, files.dict[loop->addr], &loop->stop, 0)) == NULL) {
+					fprintf(stderr, "\t\tloop type = file\n");
+					fprintf(stderr, "\t\tfound end of file\n");
+					free(loop->buff);
+					--loops.ptr;
+					if (loop->bounce == 0) fprintf(stderr, "\t\tLoop[%i]->bounce from 0 to 2\n", loops.ptr), loop->bounce = 2;
+					else fprintf(stderr, "\t\tLoop[%i]->bounce = %i\n", loops.ptr, loop->bounce);
+					fprintf(stderr, "\n");
 				}
 				else {
-					fprintf(stderr, "\t\tSep found.  Scanning from %i to %i\n", loop->start, loop->stop);
-					fprintf(stderr, "\t\tReturning to beginning of loop\n\n");
+					fprintf(stderr, "\t\tloop type = file\n");
+					fprintf(stderr, "\t\tReturning to beginning of loop\n");
 					fseek(scriptFile, loop->cmd, SEEK_SET);
+					if (loop->bounce == 2) fprintf(stderr, "\t\tLoop[%i].bounce from 2 to 0\n", loops.ptr), loop->bounce = 0;
+					else if (loop->bounce == 1) fprintf(stderr, "\t\tLoop[%i].bounce is %i.  ++Loops.ptr\n", loops.ptr, loop->bounce), ++loops.ptr;
+					fprintf(stderr, "\n");
 				}
-
-			}
-			else if ( (loop->buff = loadFile(loop->buff, files.dict[loop->addr], &loop->stop, 0)) == NULL) {
-				fprintf(stderr, "\t\tloop type = file\n");
-				fprintf(stderr, "\t\tfound end of file\n");
-				free(loop->buff);
-				--loops.ptr;
-			}
-			else {
-				fprintf(stderr, "\t\tloop type = file\n");
-				fprintf(stderr, "\t\tReturning to beginning of loop\n\n");
-				fseek(scriptFile, loop->cmd, SEEK_SET);
-			}
+			} while (loops.ptr >= 0 && loops.stack[loops.ptr].bounce);*/
 		}
 		else {
 			fprintf(stderr, "\t\tAssuming variable assignment\n");
 			int destIndex = findVar(vars, scriptLine, cursors);
 			fprintf(stderr, "\t\tAssigning to '%s'\n", vars.dict[destIndex].key);
 			int status;
-			if (scriptLine[cursors[END]] == '-' || (status=findToken(scriptLine, cursors)) == ASSIGNMENT){
+			if (scriptLine[cursors[STOP]] == '-' || (status=findToken(scriptLine, cursors)) == ASSIGNMENT){
 				fprintf(stderr, "\t\tString mode\n");
 				findToken(scriptLine, cursors);
 				char *newVar = varStrAss(vars, seps, files, loops, scriptLine, cursors);
@@ -715,28 +848,28 @@ int main(int argc, char **argv){
 			}
 			else if (status == MATHS){
 				fprintf(stderr, "\t\tMaths mode\n");
-				int result = string2Num(vars.dict[destIndex].val);
+				int result = string2Int(vars.dict[destIndex].val);
 				do {
 					switch(scriptLine[cursors[START]]){
 					case '+':
 						findToken(scriptLine, cursors);
-						result += token2Num(vars, scriptLine, cursors);
+						result += token2Int(vars, scriptLine, cursors);
 						break;
 					case '-':
 						findToken(scriptLine, cursors);
-						result -= token2Num(vars, scriptLine, cursors);
+						result -= token2Int(vars, scriptLine, cursors);
 						break;
 					case '*':
 						findToken(scriptLine, cursors);
-						result *= token2Num(vars, scriptLine, cursors);
+						result *= token2Int(vars, scriptLine, cursors);
 						break;
 					case '/':
 						findToken(scriptLine, cursors);
-						result /= token2Num(vars, scriptLine, cursors);
+						result /= token2Int(vars, scriptLine, cursors);
 						break;
 					case '%':
 						findToken(scriptLine, cursors);
-						result %= token2Num(vars, scriptLine, cursors);
+						result %= token2Int(vars, scriptLine, cursors);
 						break;
 					}
 				} while (findToken(scriptLine, cursors) != TERMINATOR);

@@ -1,7 +1,8 @@
-var tst = "hello", new = "there " tst , final="son"
-print tst "\n"
-print new "\n"
-print final "\n"
+file myFile("example.txt", "\n")
+sep column(" ")
+sep underscore("_")
+sep date("-")
 
-
-
+in myFile.column.underscore[1]
+	print date[0] "\n"
+out
