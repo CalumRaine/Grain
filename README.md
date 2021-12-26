@@ -44,8 +44,6 @@ Laura A
 ### To Do
 * If conditional statements
 * Check for redefinition of existing variables
-* Allow hierarchical printing (such as `print line[3].column[2]`)
-* Allow hierarchical looping (such as `in line[3].column`)
 * Allow stream editing by reassignment of sep/file (i.e. `column[2] = "hello"`)
 * Implement whitespace scanning for seps
 
