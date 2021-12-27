@@ -497,10 +497,31 @@ int comparator(char *scriptLine, int *cursors){
 	if (freeA) free(txtA);
 	if (freeB) free(txtB);
 
-	if (scriptLine[opCurs] == '=') return result == 0;
-	else if (scriptLine[opCurs] == '<') return scriptLine[opCurs+1] == '=' ? result <= 0 : result < 0;
-	else if (scriptLine[opCurs] == '>') return scriptLine[opCurs+1] == '=' ? result >= 0 : result > 0;
-	else return result != 0;
+	int andFlag=FALSE, orFlag=FALSE;
+	if ( findToken(scriptLine, cursors) != TERMINATOR && (andFlag=substringEquals("and", scriptLine, cursors)) == FALSE ) orFlag = substringEquals("or", scriptLine, cursors);
+
+	if (scriptLine[opCurs] == '=') {
+		if (result == 0) return andFlag ? comparator(scriptLine, cursors) : TRUE;
+		else return orFlag ? comparator(scriptLine, cursors) : FALSE;
+	}
+	else if (scriptLine[opCurs] == '<') {
+		if (scriptLine[opCurs+1] == '=') {
+			if (result <= 0) return andFlag ? comparator(scriptLine, cursors) : TRUE;
+			else return orFlag ? comparator(scriptLine, cursors) : FALSE;
+		}
+		else if (result < 0) return andFlag ? comparator(scriptLine, cursors) : TRUE;
+		else return orFlag ? comparator(scriptLine, cursors) : FALSE;
+	}
+	else if (scriptLine[opCurs] == '>') {
+		if (scriptLine[opCurs+1] == '=') {
+			if (result >= 0) return andFlag ? comparator(scriptLine, cursors) : TRUE;
+			else return orFlag ? comparator(scriptLine, cursors) : FALSE;
+		}
+		else if (result > 0) return andFlag ? comparator(scriptLine, cursors) : TRUE;
+		else return orFlag ? comparator(scriptLine, cursors) : FALSE;
+	}
+	else if (result != 0) return andFlag ? comparator(scriptLine, cursors) : TRUE;
+	else return orFlag ? comparator(scriptLine, cursors) : FALSE;
 }
 
 int nextIf(char *scriptLine, FILE *scriptFile, int *cursors){
