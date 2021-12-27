@@ -1,8 +1,10 @@
-file myFile("example.txt", "\n")
-sep column(" ")
-sep underscore("_")
-sep date("-")
+var fruit = "apple"
 
-in myFile.column.underscore[1]
-	print date[0] "\n"
-out
+if fruit == "banana"
+	print fruit " is same as banana\n"
+elif fruit < "banana" 
+	print fruit " comes before banana\n"
+else
+	print "nope\n"
+fi
+
