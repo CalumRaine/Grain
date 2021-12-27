@@ -567,6 +567,9 @@ int main(int argc, char **argv){
 			do {
 				status = findToken(scriptLine, cursors);
 				switch (status){
+				case MATHS:
+					printSubstring(loops.stack[loops.ptr].buff, loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
+					break;
 				case VARIABLE:
 					if (scriptLine[cursors[STOP]] == '['){
 						int addr;
@@ -598,10 +601,19 @@ int main(int argc, char **argv){
 
 			// Get name
 			findToken(scriptLine, cursors);
-			files.dict = realloc(files.dict, (files.count + 1) * sizeof(struct fileDict));
 
-			struct fileDict *file = &files.dict[files.count];
-			file->key = substringSave(NULL, scriptLine, cursors);
+			int addr;
+			if ( (addr = findFile(scriptLine, cursors)) == -1){
+				addr = files.count++;
+				files.dict = realloc(files.dict, files.count * sizeof(struct fileDict));
+				files.dict[addr].key = substringSave(NULL, scriptLine, cursors);
+			}
+			else {
+				free(files.dict[addr].sep);
+				fclose(files.dict[addr].fp);
+			}
+
+			struct fileDict *file = &files.dict[addr];
 
 			// Get filename
 			if (findToken(scriptLine, cursors) == QUOTE) {
@@ -629,18 +641,21 @@ int main(int argc, char **argv){
 				file->sep[0] = '\n';
 				file->sep[1] = 0;
 			}
-
-			++files.count;
 		}
 		else if (substringEquals("sep", scriptLine, cursors)){
 			//fprintf(stderr, "\t\tSEP command\n");
-			seps.dict = realloc(seps.dict, (seps.count + 1) * sizeof(struct sepDict));
-
-			struct sepDict *sep = &seps.dict[seps.count];
 
 			// Get name
 			findToken(scriptLine, cursors);
-			sep->key = substringSave(NULL, scriptLine, cursors);
+			int addr;
+			if ( (addr = findSep(scriptLine, cursors)) == -1){
+				addr = seps.count++;
+				seps.dict = realloc(seps.dict, seps.count * sizeof(struct sepDict));
+				seps.dict[addr].key = substringSave(NULL, scriptLine, cursors);
+			}
+			else free(seps.dict[addr].val);
+
+			struct sepDict *sep = &seps.dict[addr];
 
 			// Get separator
 			if (findToken(scriptLine, cursors) == QUOTE) {
@@ -663,8 +678,6 @@ int main(int argc, char **argv){
 				sep->val[0] = ' ';
 				sep->val[1] = 0;
 			}
-
-			++seps.count;
 		}
 		else if (substringEquals("in", scriptLine, cursors)){
 			//fprintf(stderr, "\t\tIN command\n");
