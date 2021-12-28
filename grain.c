@@ -363,8 +363,10 @@ char *substringJoin(char *dest, char *src, int from, int to){
 char *stringJoin(char *dest, char *src){
 	//fprintf(stderr, "FUNCTION: STRING JOIN %p %p : %s %s\n", dest, src, dest, src);
 	// Append src to dest
+	if (src == NULL) return dest;
+
 	int dLen=0, sLen=0;
-	if (dest!=NULL) while (dest[dLen] != 0) ++dLen;
+	if (dest != NULL) while (dest[dLen] != 0) ++dLen;
 	while (src[sLen] != 0) ++sLen;
 
 	dest = realloc(dest, (dLen + sLen + 1) * sizeof(char));
@@ -600,18 +602,18 @@ int main(int argc, char **argv){
 				if ( (addr = findVar(scriptLine, cursors)) == -1){
 					addr = vars.count++;
 					vars.dict = realloc(vars.dict, vars.count * sizeof(struct varDict));
-					vars.dict[addr].val = malloc(sizeof(char));
-					vars.dict[addr].val[0] = 0;
+					vars.dict[addr].val = NULL;
 					vars.dict[addr].key = substringSave(NULL, scriptLine, cursors);
-				}
-				else if (vars.dict[addr].val[0] != 0){
-					vars.dict[addr].val = realloc(vars.dict[addr].val, sizeof(char));
-					vars.dict[addr].val[0] = 0;
 				}
 
 				if (scriptLine[cursors[STOP]] == '=' || scriptLine[cursors[STOP]] != ',' && findToken(scriptLine, cursors) == ASSIGNMENT){
 					vars.dict[addr].val = varStrAss(scriptLine, cursors);
 				}
+				else if (vars.dict[addr].val == NULL || vars.dict[addr].val[0] != 0){
+					vars.dict[addr].val = realloc(vars.dict[addr].val, sizeof(char));
+					vars.dict[addr].val[0] = 0;
+				}
+
 			} while (scriptLine[cursors[START]] == ',' || scriptLine[cursors[STOP]] == ',');
 		}
 		else if (substringEquals("print", scriptLine, cursors)){
