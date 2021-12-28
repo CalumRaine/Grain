@@ -551,13 +551,20 @@ int main(int argc, char **argv){
 			//fprintf(stderr, "\t\tVAR command\n");
 			do {
 				findToken(scriptLine, cursors);
-				vars.dict = realloc(vars.dict, (vars.count + 1) * sizeof(struct varDict));
-				struct varDict *var = &vars.dict[vars.count];
-				var->val = NULL;
-				var->key = substringSave(NULL, scriptLine, cursors);
-				++vars.count;
+				int addr;
+				if ( (addr = findVar(scriptLine, cursors)) == -1){
+					addr = vars.count++;
+					vars.dict = realloc(vars.dict, vars.count * sizeof(struct varDict));
+					vars.dict[addr].val = NULL;
+					vars.dict[addr].key = substringSave(NULL, scriptLine, cursors);
+				}
+				else if (vars.dict[addr].val != NULL){
+					free(vars.dict[addr].val);
+					vars.dict[addr].val = NULL;
+				}
+
 				if (scriptLine[cursors[STOP]] == '=' || scriptLine[cursors[STOP]] != ',' && findToken(scriptLine, cursors) == ASSIGNMENT){
-					var->val = varStrAss(scriptLine, cursors);
+					vars.dict[addr].val = varStrAss(scriptLine, cursors);
 				}
 			} while (scriptLine[cursors[START]] == ',' || scriptLine[cursors[STOP]] == ',');
 		}
@@ -751,15 +758,14 @@ int main(int argc, char **argv){
 		else {
 			//fprintf(stderr, "\t\tASS\n");
 			int status, destIndex = findVar(scriptLine, cursors);
-			if (scriptLine[cursors[STOP]] == '-' || (status=findToken(scriptLine, cursors)) == ASSIGNMENT){
+			if (scriptLine[cursors[STOP]] == '=' || (status=findToken(scriptLine, cursors)) == ASSIGNMENT){
 				//fprintf(stderr, "\t\tString mode\n");
-				findToken(scriptLine, cursors);
 				char *newVar = varStrAss(scriptLine, cursors);
 				free(vars.dict[destIndex].val);
 				vars.dict[destIndex].val = newVar;
 			}
 			else if (status == MATHS){
-				//fprintf(stderr, "\t\tMaths mode\n");
+				fprintf(stderr, "\t\tMaths mode\n");
 				int result = string2Int(vars.dict[destIndex].val);
 				do {
 					switch(scriptLine[cursors[START]]){
