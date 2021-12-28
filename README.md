@@ -42,8 +42,6 @@ Laura A
 ```
 
 ### To Do
-* Initialise variables to 0, by default
-* Implement whitespace scanning for seps
 
 ### Roadmap
 1. `var name = ""`

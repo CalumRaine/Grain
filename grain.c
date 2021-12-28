@@ -600,12 +600,13 @@ int main(int argc, char **argv){
 				if ( (addr = findVar(scriptLine, cursors)) == -1){
 					addr = vars.count++;
 					vars.dict = realloc(vars.dict, vars.count * sizeof(struct varDict));
-					vars.dict[addr].val = NULL;
+					vars.dict[addr].val = malloc(sizeof(char));
+					vars.dict[addr].val[0] = 0;
 					vars.dict[addr].key = substringSave(NULL, scriptLine, cursors);
 				}
-				else if (vars.dict[addr].val != NULL){
-					free(vars.dict[addr].val);
-					vars.dict[addr].val = NULL;
+				else if (vars.dict[addr].val[0] != 0){
+					vars.dict[addr].val = realloc(vars.dict[addr].val, sizeof(char));
+					vars.dict[addr].val[0] = 0;
 				}
 
 				if (scriptLine[cursors[STOP]] == '=' || scriptLine[cursors[STOP]] != ',' && findToken(scriptLine, cursors) == ASSIGNMENT){
