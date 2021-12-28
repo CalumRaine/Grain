@@ -42,9 +42,6 @@ Laura A
 ```
 
 ### To Do
-* Chain conditional statements with `and` or `or`
-* Check for redefinition of existing variables
-* Allow stream editing by reassignment of sep/file (i.e. `column[2] = "hello"`)
 * Implement whitespace scanning for seps
 
 ### Roadmap
