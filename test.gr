@@ -1,10 +1,16 @@
-var fruit = "apple"
+file dickens("Pip.txt")
+sep pip("Pip")
 
-if fruit == "banana"
-	print fruit " is same as banana\n"
-elif fruit < "banana" 
-	print fruit " comes before banana\n"
-else
-	print "nope\n"
-fi
+var count = 0
+in dickens
+	var column = 0
+	in pip
+		if column > 0
+			count += 1
+		fi
+		column += 1
+	out
+out
 
+print "GRAIN\n"
+print count "\n"

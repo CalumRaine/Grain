@@ -5,7 +5,7 @@
 #define SEP 1
 
 enum pos {START, STOP};
-enum tokenType {TERMINATOR, QUOTE, VARIABLE, COMMA, ASSIGNMENT, MATHS};
+enum tokenType {TERMINATOR, QUOTE, VARIABLE, COMMA, ASSIGNMENT, MATHS, NUMBER};
 enum boolean {FALSE, TRUE};
 
 struct fileDict {
@@ -60,7 +60,7 @@ struct loopStack {
 } loops;
 
 int findToken(char *txt, int *cursors){
-	//fprintf(stderr, "FIND TOKEN %p %i %i\n", txt, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: FIND TOKEN %p %i %i\n", txt, cursors[START], cursors[STOP]);
 	// Moves cursors[START] and cursors[STOP] around next token
 	// Returns int representing type of token found
 
@@ -87,7 +87,7 @@ int findToken(char *txt, int *cursors){
 	case '*':
 	case '/':
 	case '%':
-		cursors[STOP] = cursors[START];
+		cursors[STOP] = cursors[START] + 1;
 		return MATHS;
 	case '\'':
 	case '"':
@@ -123,6 +123,29 @@ int findToken(char *txt, int *cursors){
 		}
 		++cursors[START];
 		return QUOTE;
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	case '8':
+	case '9':
+		for (cursors[STOP] = cursors[START]+1; txt[cursors[STOP]] != ' ' 
+						   && txt[cursors[STOP]] != '\t' 
+						   && txt[cursors[STOP]] != '\n' 
+					           && txt[cursors[STOP]] != 0 
+					           && txt[cursors[STOP]] != '=' 
+						   && txt[cursors[STOP]] != ';'
+						   && txt[cursors[STOP]] != ','
+						   && txt[cursors[STOP]] != '.'
+						   && txt[cursors[STOP]] != '('
+						   && txt[cursors[STOP]] != ')'
+						   && txt[cursors[STOP]] != '['
+						   && txt[cursors[STOP]] != ']' ; ++cursors[STOP]);
+		return NUMBER;
 	default:
 		for (cursors[STOP] = cursors[START]+1; txt[cursors[STOP]] != ' ' 
 						   && txt[cursors[STOP]] != '\t' 
@@ -141,7 +164,7 @@ int findToken(char *txt, int *cursors){
 }
 
 int substringEquals(char *comp, char *txt, int *cursors){
-	//fprintf(stderr, "SUBSTRING EQUALS %p %p %p %i %i\n", comp, txt, cursors, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: SUBSTRING EQUALS %p %p %p %i %i\n", comp, txt, cursors, cursors[START], cursors[STOP]);
 	// Checks if comp matches txt[START-STOP]
 	int compPos=0;
 	for (int txtPos=cursors[START]; txtPos < cursors[STOP]; ++compPos, ++txtPos) if (comp[compPos] != txt[txtPos]) return 0;
@@ -149,14 +172,14 @@ int substringEquals(char *comp, char *txt, int *cursors){
 }
 
 int stringEquals(char *comp, char *txt){
-	//fprintf(stderr, "STRING EQUALS %p %p\n", comp, txt);
+	//fprintf(stderr, "FUNCTION: STRING EQUALS %p %p\n", comp, txt);
 	// Checks if comp matches txt
 	for (int i=0; comp[i] != 0 && txt[i] != 0; ++i) if (comp[i] != txt[i]) return 0;
 	return 1;
 }
 
 char *substringSave(char *dest, char *source, int *cursors){
-	//fprintf(stderr, "SUBSTRING SAVE %p %p %p %i %i\n", dest, source, cursors, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: SUBSTRING SAVE %p %p %p %i %i\n", dest, source, cursors, cursors[START], cursors[STOP]);
 	// Reallocate dest
 	// Copy source[START-STOP] into dest
 	dest = realloc(dest, (1 + cursors[STOP] - cursors[START]) * sizeof(char));
@@ -166,7 +189,7 @@ char *substringSave(char *dest, char *source, int *cursors){
 }
 
 char *stringSave(char *dest, char *source){
-	//fprintf(stderr, "STRING SAVE %p %p\n", dest, source);
+	//fprintf(stderr, "FUNCTION: STRING SAVE %p %p\n", dest, source);
 	// Reallocate dest
 	// Copy source into dest
 	int length;
@@ -180,28 +203,28 @@ char *stringSave(char *dest, char *source){
 }
 
 int findVar(char *txt, int *cursors){
-	//fprintf(stderr, "FIND VAR %p %i %i\n", txt, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: FIND VAR %p %i %i\n", txt, cursors[START], cursors[STOP]);
 	// Returns index of var in varDict where key matches txt substring.  Or -1
 	for (int v=0; v < vars.count; ++v) if (substringEquals(vars.dict[v].key, txt, cursors)) return v;
 	return -1;
 }
 
 int findFile(char *txt, int *cursors){
-	//fprintf(stderr, "FIND FILE %p %i %i\n", txt, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: FIND FILE %p %i %i\n", txt, cursors[START], cursors[STOP]);
 	// Returns index of file in fileDict where key matches txt substring.  Or -1
 	for (int f=0; f < files.count; ++f) if (substringEquals(files.dict[f].key, txt, cursors)) return f;
 	return -1;
 }
 
 int findSep(char *txt, int *cursors){
-	//fprintf(stderr, "FIND SEP %p %i %i\n", txt, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: FIND SEP %p %i %i\n", txt, cursors[START], cursors[STOP]);
 	// Returns index of sep in sepDict where key matches txt substring.  Or -1
 	for (int s=0; s < seps.count; ++s) if (substringEquals(seps.dict[s].key, txt, cursors)) return s;
 	return -1;
 }
 
 int substring2Int(char *txt, int *cursors){
-	//fprintf(stderr, "SUBSTRING 2 INT %p %p %i %i\n", txt, cursors, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: SUBSTRING 2 INT %p %p %i %i\n", txt, cursors, cursors[START], cursors[STOP]);
 	// Converts txt[START-STOP] to int
 	int result = 0;
 	for (int i=cursors[START]; i < cursors[STOP]; ++i){
@@ -212,7 +235,7 @@ int substring2Int(char *txt, int *cursors){
 }
 
 int string2Int(char *txt){
-	//fprintf(stderr, "STRING 2 INT %s\n", txt);
+	//fprintf(stderr, "FUNCTION: STRING 2 INT %s\n", txt);
 	// Converts txt to int
 	int result=0;
 	for (int i=0; txt[i] != 0; ++i){
@@ -223,7 +246,7 @@ int string2Int(char *txt){
 }
 
 int loadSepStop(char *txt, char *sep, int start, int stop){
-	//fprintf(stderr, "LOAD SEP STOP %p %s %i %i\n", txt, sep, start, stop);
+	//fprintf(stderr, "FUNCTION: LOAD SEP STOP %p %s %i %i\n", txt, sep, start, stop);
 	// Returns sep starting position in txt[start-stop]
 	for (int i=start, j; i < stop; ++i){
 		for (j=0; sep[j] != 0 && txt[i+j] == sep[j]; ++j);
@@ -233,14 +256,14 @@ int loadSepStop(char *txt, char *sep, int start, int stop){
 }
 
 int loadSepStart(char *txt, struct sepDict sep, int index, int from, int to){
-	//fprintf(stderr, "LOAD SEP START %p %s %i %i %i\n", txt, sep.val, index, from, to);
+	//fprintf(stderr, "FUNCTION: LOAD SEP START %p %s %i %i %i\n", txt, sep.val, index, from, to);
 	// Skip sep position after index number of seps
 	while (index-- && (from = loadSepStop(txt, sep.val, from, to)) != 1) from += sep.len;
 	return from;
 }
 
 char *loadFile(char *buff, struct fileDict file, int *length, int index){
-	//fprintf(stderr, "LOAD FILE %p %s %i\n", buff, file.key, index);
+	//fprintf(stderr, "FUNCTION: LOAD FILE %p %s %i\n", buff, file.key, index);
 	// Skip index number of file records and load next into buff
 	// Saves buff length into length
 	int buffCap, lastCap, end, read;
@@ -257,7 +280,7 @@ char *loadFile(char *buff, struct fileDict file, int *length, int index){
 
 	*length = (end == -1 ? lastCap + read : lastCap + end);
 
-	if (*length == 0){
+	if (feof(file.fp)){
 		free(buff);
 		return NULL;
 	}
@@ -268,7 +291,7 @@ char *loadFile(char *buff, struct fileDict file, int *length, int index){
 }
 
 int breakLoop(struct loopStruct loop, char *scriptLine, FILE *scriptFile){
-	//fprintf(stderr, "BREAK LOOP %s %s\n", loop.type == SEP ? "SEP" : "FILE", scriptLine); 
+	//fprintf(stderr, "FUNCTION: BREAK LOOP %s %s\n", loop.type == SEP ? "SEP" : "FILE", scriptLine); 
 	// Move cursor to next OUT command
 	// Free buffer if loop has type FILE
 
@@ -284,7 +307,7 @@ int breakLoop(struct loopStruct loop, char *scriptLine, FILE *scriptFile){
 }
 
 void printSubstring(char *txt, int start, int stop){
-	//fprintf(stderr, "PRINT SUBSTRING %p %i %i\n", txt, start, stop);
+	//fprintf(stderr, "FUNCTION: PRINT SUBSTRING %p %i %i\n", txt, start, stop);
 	// Temporarily null terminate substring for printing
 	char swap = txt[stop];
 	txt[stop] = 0;
@@ -293,13 +316,13 @@ void printSubstring(char *txt, int start, int stop){
 }
 
 int token2Int(char *txt, int *cursors){
-	//fprintf(stderr, "TOKEN 2 INT %p %i %i\n", txt, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: TOKEN 2 INT %p %i %i\n", txt, cursors[START], cursors[STOP]);
 	// Convert token to integer.  Either variable or string number.
 	return txt[cursors[START]] >= 48 && txt[cursors[START]] <= 57 ? substring2Int(txt, cursors) : string2Int(vars.dict[findVar(txt, cursors)].val);
 }
 
 char *int2String(char *txt, int num){
-	//fprintf(stderr, "INT 2 STRING %p %i\n", txt, num);
+	//fprintf(stderr, "FUNCTION: INT 2 STRING %p %i\n", txt, num);
 	// Convert integer to string
 	int digits = num < 1 ? 1 : 0;
 	for (int cpy=num; cpy != 0; cpy/=10, ++digits);
@@ -317,10 +340,10 @@ char *int2String(char *txt, int num){
 }
 
 char *substringJoin(char *dest, char *src, int from, int to){
-	//fprintf(stderr, "SUBSTRING JOIN %p %p %i %i\n", dest, src, from, to);
+	//fprintf(stderr, "FUNCTION: SUBSTRING JOIN %p %p %i %i\n", dest, src, from, to);
 	// Join source[from-to] to end of dest
 	int len=0;
-	if (dest!=NULL) while (dest[len++] != 0);
+	if (dest!=NULL) while (dest[len] != 0) ++len;
 	
 	dest = realloc(dest, (len + to - from + 1) * sizeof(char));
 	for (int dPos=len, sPos=from; sPos < to; ++dPos, ++sPos) dest[dPos] = src[sPos];
@@ -329,11 +352,11 @@ char *substringJoin(char *dest, char *src, int from, int to){
 }
 
 char *stringJoin(char *dest, char *src){
-	//fprintf(stderr, "STRING JOIN %p %p : %s %s\n", dest, src, dest, src);
+	//fprintf(stderr, "FUNCTION: STRING JOIN %p %p : %s %s\n", dest, src, dest, src);
 	// Append src to dest
 	int dLen=0, sLen=0;
-	if (dest!=NULL) while (dest[dLen++] != 0);
-	while (src[sLen++] != 0);
+	if (dest!=NULL) while (dest[dLen] != 0) ++dLen;
+	while (src[sLen] != 0) ++sLen;
 
 	dest = realloc(dest, (dLen + sLen + 1) * sizeof(char));
 	for (int dPos=dLen, sPos=0; src[sPos]!=0; ++dPos, ++sPos) dest[dPos] = src[sPos];
@@ -342,11 +365,11 @@ char *stringJoin(char *dest, char *src){
 }
 
 char *varStrAss(char *scriptLine, int *cursors){
-	//fprintf(stderr, "VAR STR ASS %i %i %i %s\n", loops.ptr, cursors[START], cursors[STOP], scriptLine);
+	//fprintf(stderr, "FUNCTION: VAR STR ASS %i %i %i %s\n", loops.ptr, cursors[START], cursors[STOP], scriptLine);
 	// Assign multiple concatenated strings to a variable
 	char *buff = NULL;
 	for (int status=findToken(scriptLine, cursors), addr, start, stop; status != TERMINATOR && status != COMMA; status = scriptLine[cursors[STOP]] == ',' ? COMMA : findToken(scriptLine, cursors)){
-		if (status == QUOTE || scriptLine[cursors[START]] >= 48 && scriptLine[cursors[START]] <= 57) buff = substringJoin(buff, scriptLine, cursors[START], cursors[STOP]);
+		if (status == QUOTE || status == NUMBER) buff = substringJoin(buff, scriptLine, cursors[START], cursors[STOP]);
 		else if (scriptLine[cursors[STOP]] == '['){
 			if ( (addr=findSep(scriptLine, cursors)) != -1 ) {
 				findToken(scriptLine, cursors);
@@ -373,7 +396,7 @@ struct loopStack resetLoop(char *scriptLine, FILE *scriptFile){
 	// Setup loopStruct cursors 
 	struct loopStruct *loop = &loops.stack[loops.ptr];
 	struct loopStruct *parent = &loops.stack[loops.ptr-1];
-	//fprintf(stderr, "RESET LOOP loops.ptr %i type %i\n", loops.ptr, loop->type);
+	//fprintf(stderr, "FUNCTION: RESET LOOP loops.ptr %i type %i\n", loops.ptr, loop->type);
 	loop->buff = parent->buff;
 
 	loop->start = loop->index == -1 ? parent->start : loadSepStart(loop->buff, seps.dict[loop->addr], loop->index, parent->start, parent->stop);
@@ -388,6 +411,7 @@ struct loopStack resetLoop(char *scriptLine, FILE *scriptFile){
 		return resetLoop(scriptLine, scriptFile);
 	}
 
+	fseek(scriptFile, loop->cmd, SEEK_SET);
 	return loops;
 }
 
@@ -395,29 +419,40 @@ struct loopStack loadLoop(char *scriptLine, FILE *scriptFile){
 	// Advance loopStruct cursors
 	struct loopStruct *loop = &loops.stack[loops.ptr];
 	struct loopStruct *parent = &loops.stack[loops.ptr-1];
-	//fprintf(stderr, "LOAD LOOP loops.ptr %i type %i\n", loops.ptr, loop->type);
+	//fprintf(stderr, "FUNCTION: LOAD LOOP loops.ptr %i type %s %i %i\n", loops.ptr, loop->type == SEP ? "SEP" : "FILE", loop->start, loop->stop);
 
-	if (loop->isLoop == FALSE) return --loops.ptr == -1 ? loops : loadLoop(scriptLine, scriptFile);
+	if (loop->isLoop == FALSE) {
+		--loops.ptr;
+		return loops.ptr == -1 || !loops.stack[loops.ptr].bounce ? loops : loadLoop(scriptLine, scriptFile);
+	}
 	else if (loop->type == SEP){
-		if ( (loop->start = loop->stop + seps.dict[loop->addr].len) > parent->stop) 
-			return --loops.ptr == -1 ? loops : loadLoop(scriptLine, scriptFile);
-		else if ( (loop->stop = loadSepStop(loop->buff, seps.dict[loop->addr].val, loop->start, parent->stop)) == -1) 
+		if ( (loop->start = loop->stop + seps.dict[loop->addr].len) > parent->stop){
+			--loops.ptr;
+			return loops.ptr == -1 || !loops.stack[loops.ptr].bounce ? loops : loadLoop(scriptLine, scriptFile);
+		}
+		else if ( (loop->stop = loadSepStop(loop->buff, seps.dict[loop->addr].val, loop->start, parent->stop)) == -1){
 			loop->stop = parent->stop;
+		}
 	}
 	else if ( (loop->buff = loadFile(loop->buff, files.dict[loop->addr], &loop->stop, 0)) == NULL) {
-		return --loops.ptr == -1 ? loops : loadLoop(scriptLine, scriptFile);
+		--loops.ptr;
+		return loops.ptr == -1 || !loops.stack[loops.ptr].bounce ? loops : loadLoop(scriptLine, scriptFile);
 	}
 	
 	if (loop->bounce){
 		++loops.ptr;
 		return resetLoop(scriptLine, scriptFile);
 	}
-	else return loops;
+	else {
+		fseek(scriptFile, loop->cmd, SEEK_SET);
+		return loops;
+	}
 }
 
 int retrieveToken(int *outCurs, char **outTxt, char *scriptLine, int *cursors){
-	//fprintf(stderr, "RETRIEVE TOKEN called: %i %i %p %p %i %i\n", outCurs[START], outCurs[STOP], outTxt, scriptLine, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: RETRIEVE TOKEN called: %i %i %p %p %i %i\n", outCurs[START], outCurs[STOP], outTxt, scriptLine, cursors[START], cursors[STOP]);
 	switch (findToken(scriptLine, cursors)){
+	case NUMBER:
 	case QUOTE:
 		outCurs[START] = cursors[START];
 		outCurs[STOP] = cursors[STOP];
@@ -450,19 +485,19 @@ int retrieveToken(int *outCurs, char **outTxt, char *scriptLine, int *cursors){
 }
 
 int substringIsNum(char *txt, int from, int to){
-	//fprintf(stderr, "SUBSTRING IS NUM %p %i %i\n", txt, from, to);
+	//fprintf(stderr, "FUNCTION: SUBSTRING IS NUM %p %i %i\n", txt, from, to);
 	for (  ; from < to; ++from) if (txt[from] < 48 || txt[from] > 57) return FALSE;
 	return TRUE;
 }
 
 int stringIsNum(char *txt){
-	//fprintf(stderr, "STRING IS NUM %p\n", txt);
+	//fprintf(stderr, "FUNCTION: STRING IS NUM %p\n", txt);
 	for (int pos=0; txt[pos]!=0; ++pos) if (txt[pos] < 48 || txt[pos] > 57) return FALSE;
 	return TRUE;
 }
 
 int compareTokens(char *txtA, int *cursA, char *txtB, int *cursB){
-	//fprintf(stderr, "COMPARE TOKENS: %p %i %i %p %i %i\n", txtA, cursA[START], cursA[STOP], txtB, cursB[START], cursB[STOP]);
+	//fprintf(stderr, "FUNCTION: COMPARE TOKENS: %p %i %i %p %i %i\n", txtA, cursA[START], cursA[STOP], txtB, cursB[START], cursB[STOP]);
 	int aIsNum = cursA[START] == -1 ? stringIsNum(txtA) : substringIsNum(txtA, cursA[START], cursA[STOP]);
 	int bIsNum = cursB[START] == -1 ? stringIsNum(txtB) : substringIsNum(txtB, cursB[START], cursB[STOP]);
 	if (aIsNum && bIsNum){
@@ -481,7 +516,7 @@ int compareTokens(char *txtA, int *cursA, char *txtB, int *cursB){
 }
 
 int comparator(char *scriptLine, int *cursors){
-	//fprintf(stderr, "COMPARATOR called %p %i %i\n", scriptLine, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: COMPARATOR called %p %i %i\n", scriptLine, cursors[START], cursors[STOP]);
 	int cursA[2], cursB[2];
 	char *txtA, *txtB;
 	
@@ -525,7 +560,7 @@ int comparator(char *scriptLine, int *cursors){
 }
 
 int nextIf(char *scriptLine, FILE *scriptFile, int *cursors){
-	//fprintf(stderr, "NEXT IF %p %i %i\n", scriptLine, cursors[START], cursors[STOP]);
+	//fprintf(stderr, "FUNCTION: NEXT IF %p %i %i\n", scriptLine, cursors[START], cursors[STOP]);
 	while (fgets(scriptLine, READ_SIZE + 1, scriptFile)){
 		cursors[STOP] = -1;
 		findToken(scriptLine, cursors);
@@ -544,11 +579,11 @@ int main(int argc, char **argv){
 	char scriptLine[READ_SIZE + 1];
 	FILE *scriptFile = fopen(argv[1], "r");
 	for ( fgets(scriptLine, READ_SIZE + 1, scriptFile) ; !feof(scriptFile); fgets(scriptLine, READ_SIZE + 1, scriptFile) ) {
-		//fprintf(stderr, "\t\t*INPUT LINE*: %s", scriptLine);
+		//fprintf(stderr, "INPUT LINE: %s", scriptLine);
 		int cursors[2] = {0, -1};
 		if (!findToken(scriptLine, cursors)) continue;
 		else if (substringEquals("var", scriptLine, cursors)){
-			//fprintf(stderr, "\t\tVAR command\n");
+			//fprintf(stderr, "COMMAND: VAR\n");
 			do {
 				findToken(scriptLine, cursors);
 				int addr;
@@ -569,11 +604,14 @@ int main(int argc, char **argv){
 			} while (scriptLine[cursors[START]] == ',' || scriptLine[cursors[STOP]] == ',');
 		}
 		else if (substringEquals("print", scriptLine, cursors)){
-			//fprintf(stderr, "\t\tPRINT command\n");
+			//fprintf(stderr, "PRINT command\n");
 			int status;
 			do {
 				status = findToken(scriptLine, cursors);
 				switch (status){
+				case NUMBER:
+					printSubstring(scriptLine, cursors[START], cursors[STOP]);
+					break;
 				case MATHS:
 					printSubstring(loops.stack[loops.ptr].buff, loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
 					break;
@@ -595,7 +633,9 @@ int main(int argc, char **argv){
 							free(string);
 						}
 					}
-					else printf("%s", vars.dict[findVar(scriptLine, cursors)].val);
+					else {
+						printf("%s", vars.dict[findVar(scriptLine, cursors)].val);
+					}
 					break;
 				case QUOTE:
 					printSubstring(scriptLine, cursors[START], cursors[STOP]);
@@ -604,7 +644,7 @@ int main(int argc, char **argv){
 			} while (status != TERMINATOR);
 		}
 		else if (substringEquals("file", scriptLine, cursors)){
-			//fprintf(stderr, "\t\tFILE command\n");
+			//fprintf(stderr, "COMMAND: FILE\n");
 
 			// Get name
 			findToken(scriptLine, cursors);
@@ -650,7 +690,7 @@ int main(int argc, char **argv){
 			}
 		}
 		else if (substringEquals("sep", scriptLine, cursors)){
-			//fprintf(stderr, "\t\tSEP command\n");
+			//fprintf(stderr, "COMMAND: SEP\n");
 
 			// Get name
 			findToken(scriptLine, cursors);
@@ -687,9 +727,8 @@ int main(int argc, char **argv){
 			}
 		}
 		else if (substringEquals("in", scriptLine, cursors)){
-			//fprintf(stderr, "\t\tIN command\n");
+			//fprintf(stderr, "COMMAND: IN\n");
 			do {
-				//fprintf(stderr, "\t\t\tIteration\n");
 				if (++loops.ptr == loops.cap){
 					++loops.cap;
 					loops.stack = realloc(loops.stack, loops.cap * sizeof(struct loopStruct));
@@ -740,12 +779,11 @@ int main(int argc, char **argv){
 			} while ( loops.stack[loops.ptr].bounce = (scriptLine[cursors[STOP]] == '.') );
 		}
 		else if (substringEquals("out", scriptLine, cursors) || substringEquals("cont", scriptLine, cursors)){
-			//fprintf(stderr, "\t\tOUT comand\n");
+			//fprintf(stderr, "COMMAND: OUT\n");
 			loops = loadLoop(scriptLine, scriptFile);
-			if (loops.ptr != -1) fseek(scriptFile, loops.stack[loops.ptr].cmd, SEEK_SET);
 		}
 		else if (substringEquals("if", scriptLine, cursors)){
-			//fprintf(stderr, "\t\tIF command\n");
+			//fprintf(stderr, "COMMAND: IF\n");
 			while ( comparator(scriptLine, cursors) == FALSE && nextIf(scriptLine, scriptFile, cursors) == FALSE);
 		}
 		else if (substringEquals("elif", scriptLine, cursors) || substringEquals("else", scriptLine, cursors)){
@@ -753,10 +791,10 @@ int main(int argc, char **argv){
 			for (fgets(scriptLine, READ_SIZE + 1, scriptFile) ; substringEquals("fi", scriptLine, cursors) == FALSE; fgets(scriptLine, READ_SIZE + 1, scriptFile), cursors[STOP]=-1, findToken(scriptLine, cursors));
 		}
 		else if (substringEquals("fi", scriptLine, cursors)){
-			//fprintf(stderr, "FI found\n");
+			//fprintf(stderr, "COMMAND: FI\n");
 		}
 		else {
-			//fprintf(stderr, "\t\tASS\n");
+			//fprintf(stderr, "COMMAND: ASSIGNMENT\n");
 			int status, destIndex = findVar(scriptLine, cursors);
 			if (scriptLine[cursors[STOP]] == '=' || (status=findToken(scriptLine, cursors)) == ASSIGNMENT){
 				//fprintf(stderr, "\t\tString mode\n");
@@ -765,7 +803,7 @@ int main(int argc, char **argv){
 				vars.dict[destIndex].val = newVar;
 			}
 			else if (status == MATHS){
-				fprintf(stderr, "\t\tMaths mode\n");
+				//fprintf(stderr, "\t\tMaths mode\n");
 				int result = string2Int(vars.dict[destIndex].val);
 				do {
 					switch(scriptLine[cursors[START]]){
@@ -791,9 +829,10 @@ int main(int argc, char **argv){
 						break;
 					}
 				} while (findToken(scriptLine, cursors) != TERMINATOR);
-				int2String(vars.dict[destIndex].val, result);
+				vars.dict[destIndex].val = int2String(vars.dict[destIndex].val, result);
 			}
 		}
+		//fprintf(stderr, "\n");
 	}
 	return 0;
 }
