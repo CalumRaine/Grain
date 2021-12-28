@@ -250,7 +250,7 @@ int loadSepStop(char *txt, char *sep, int start, int stop){
 	// Returns sep starting position in txt[start-stop]
 	for (int i=start, j; i < stop; ++i){
 		for (j=0; sep[j] != 0 && txt[i+j] == sep[j]; ++j);
-		if (sep[j] == 0) return i;
+		if (sep[j] == 0) return i + (sep[0] == 0);
 	}
 	return -1;
 }
@@ -426,7 +426,7 @@ struct loopStack loadLoop(char *scriptLine, FILE *scriptFile){
 		return loops.ptr == -1 || !loops.stack[loops.ptr].bounce ? loops : loadLoop(scriptLine, scriptFile);
 	}
 	else if (loop->type == SEP){
-		if ( (loop->start = loop->stop + seps.dict[loop->addr].len) > parent->stop){
+		if ( (loop->start = loop->stop + seps.dict[loop->addr].len) >= parent->stop){
 			--loops.ptr;
 			return loops.ptr == -1 || !loops.stack[loops.ptr].bounce ? loops : loadLoop(scriptLine, scriptFile);
 		}
@@ -706,24 +706,17 @@ int main(int argc, char **argv){
 
 			// Get separator
 			if (findToken(scriptLine, cursors) == QUOTE) {
-				if (cursors[START] == cursors[STOP]){
-					sep->val = malloc(sizeof(char));
-					sep->val[0] = 0;
-					sep->len = 1;
-				}
-				else {
-					sep->len = cursors[STOP] - cursors[START];
-					sep->val = substringSave(NULL, scriptLine, cursors);
-				}
+				sep->len = cursors[STOP] - cursors[START];
+				sep->val = substringSave(NULL, scriptLine, cursors);
 			}
 			else if (scriptLine[cursors[START]] != ')'){
-				sep->val = stringSave(NULL, vars.dict[findVar(scriptLine, cursors)].val);
+				int addr = findVar(scriptLine, cursors);
+				sep->val = stringSave(NULL, vars.dict[addr].val);
+				for (sep->len = 0; sep->val[sep->len] != 0; ++sep->len);
 			}
 			else {
-				sep->len = 1;
-				sep->val = malloc(2 * sizeof(char));
-				sep->val[0] = ' ';
-				sep->val[1] = 0;
+				sep->len = 0;
+				sep->val = NULL;
 			}
 		}
 		else if (substringEquals("in", scriptLine, cursors)){
