@@ -245,20 +245,29 @@ int string2Int(char *txt){
 	return result;
 }
 
+int skipWhitespace(char *txt, int from){
+	while (txt[++from] == ' ' || txt[from] == '\t' || txt[from] == '\n');
+	return from;
+}
+
 int loadSepStop(char *txt, char *sep, int start, int stop){
 	//fprintf(stderr, "FUNCTION: LOAD SEP STOP %p %s %i %i\n", txt, sep, start, stop);
 	// Returns sep starting position in txt[start-stop]
-	for (int i=start, j; i < stop; ++i){
+	if (sep == NULL){
+		while (txt[start] != ' ' && txt[start] != '\t' && txt[start] != '\n' && start < stop) ++start  ;
+		return start >= stop ? -1 : start;
+	}
+	else for (int i=start, j; i < stop; ++i){
 		for (j=0; sep[j] != 0 && txt[i+j] == sep[j]; ++j);
 		if (sep[j] == 0) return i + (sep[0] == 0);
 	}
 	return -1;
 }
 
-int loadSepStart(char *txt, struct sepDict sep, int index, int from, int to){
-	//fprintf(stderr, "FUNCTION: LOAD SEP START %p %s %i %i %i\n", txt, sep.val, index, from, to);
+int loadSepStart(char *txt, struct sepDict *sep, int index, int from, int to){
+	//fprintf(stderr, "FUNCTION: LOAD SEP START %p %s %i %i %i\n", txt, sep->val, index, from, to);
 	// Skip sep position after index number of seps
-	while (index-- && (from = loadSepStop(txt, sep.val, from, to)) != 1) from += sep.len;
+	while (index-- && (from = loadSepStop(txt, sep->val, from, to)) != -1) from = (sep->val == NULL ? skipWhitespace(txt, from) : from + sep->len) ;
 	return from;
 }
 
@@ -373,7 +382,7 @@ char *varStrAss(char *scriptLine, int *cursors){
 		else if (scriptLine[cursors[STOP]] == '['){
 			if ( (addr=findSep(scriptLine, cursors)) != -1 ) {
 				findToken(scriptLine, cursors);
-				start = loadSepStart(loops.stack[loops.ptr].buff, seps.dict[addr], token2Int(scriptLine, cursors), loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
+				start = loadSepStart(loops.stack[loops.ptr].buff, &seps.dict[addr], token2Int(scriptLine, cursors), loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
 				stop = loadSepStop(loops.stack[loops.ptr].buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop);
 				if (stop == -1) stop = loops.stack[loops.ptr].stop;
 				buff = substringJoin(buff, loops.stack[loops.ptr].buff, start, stop);
@@ -399,7 +408,7 @@ struct loopStack resetLoop(char *scriptLine, FILE *scriptFile){
 	//fprintf(stderr, "FUNCTION: RESET LOOP loops.ptr %i type %i\n", loops.ptr, loop->type);
 	loop->buff = parent->buff;
 
-	loop->start = loop->index == -1 ? parent->start : loadSepStart(loop->buff, seps.dict[loop->addr], loop->index, parent->start, parent->stop);
+	loop->start = loop->index == -1 ? parent->start : loadSepStart(loop->buff, &seps.dict[loop->addr], loop->index, parent->start, parent->stop);
 	if (loop->start == -1){
 		if (loop->type != SEP) free(loop->buff);
 		return --loops.ptr == -1 ? loops : loadLoop(scriptLine, scriptFile);
@@ -426,7 +435,8 @@ struct loopStack loadLoop(char *scriptLine, FILE *scriptFile){
 		return loops.ptr == -1 || !loops.stack[loops.ptr].bounce ? loops : loadLoop(scriptLine, scriptFile);
 	}
 	else if (loop->type == SEP){
-		if ( (loop->start = loop->stop + seps.dict[loop->addr].len) >= parent->stop){
+		loop->start = (seps.dict[loop->addr].val == NULL ? skipWhitespace(loop->buff, loop->stop) : loop->stop + seps.dict[loop->addr].len);
+		if (loop->start > parent->stop || seps.dict[loop->addr].val[0] == 0 && loop->start == parent->stop){
 			--loops.ptr;
 			return loops.ptr == -1 || !loops.stack[loops.ptr].bounce ? loops : loadLoop(scriptLine, scriptFile);
 		}
@@ -463,7 +473,7 @@ int retrieveToken(int *outCurs, char **outTxt, char *scriptLine, int *cursors){
 			int addr;
 			if ( (addr=findSep(scriptLine, cursors)) != -1 ) {
 				findToken(scriptLine, cursors);
-				outCurs[START] = loadSepStart(loops.stack[loops.ptr].buff, seps.dict[addr], token2Int(scriptLine, cursors), loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
+				outCurs[START] = loadSepStart(loops.stack[loops.ptr].buff, &seps.dict[addr], token2Int(scriptLine, cursors), loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
 				outCurs[STOP] = loadSepStop(loops.stack[loops.ptr].buff, seps.dict[addr].val, outCurs[START], loops.stack[loops.ptr].stop);
 				if (outCurs[STOP] == -1) outCurs[STOP] = loops.stack[loops.ptr].stop;
 				*outTxt = loops.stack[loops.ptr].buff;
@@ -620,7 +630,7 @@ int main(int argc, char **argv){
 						int addr;
 						if ( (addr=findSep(scriptLine, cursors)) != -1 ) {
 							findToken(scriptLine, cursors);
-							int start = loadSepStart(loops.stack[loops.ptr].buff, seps.dict[addr], token2Int(scriptLine, cursors), loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
+							int start = loadSepStart(loops.stack[loops.ptr].buff, &seps.dict[addr], token2Int(scriptLine, cursors), loops.stack[loops.ptr].start, loops.stack[loops.ptr].stop);
 							int stop = loadSepStop(loops.stack[loops.ptr].buff, seps.dict[addr].val, start, loops.stack[loops.ptr].stop);
 							if (stop == -1) stop = loops.stack[loops.ptr].stop;
 							printSubstring(loops.stack[loops.ptr].buff, start, stop);
@@ -754,7 +764,7 @@ int main(int argc, char **argv){
 					loop->buff = parent.buff;
 
 					// This is bad code
-					loop->start = loop->index == -1 ? parent.start : loadSepStart(loop->buff, seps.dict[loop->addr], loop->index, parent.start, parent.stop);
+					loop->start = loop->index == -1 ? parent.start : loadSepStart(loop->buff, &seps.dict[loop->addr], loop->index, parent.start, parent.stop);
 					if (loop->start != -1 && (loop->stop = loadSepStop(loop->buff, seps.dict[loop->addr].val, loop->start, parent.stop)) == -1){
 						loop->stop = parent.stop;
 					}
