@@ -475,7 +475,7 @@ struct loopStack loadLoop(char *scriptLine, FILE *scriptFile){
 	}
 	else if (loop->type == SEP){
 		loop->start = (seps.dict[loop->addr].val == NULL ? skipWhitespace(loop->buff, loop->stop) : loop->stop + seps.dict[loop->addr].len);
-		if (loop->start > parent->stop || seps.dict[loop->addr].val[0] == 0 && loop->start == parent->stop){
+		if (loop->start > parent->stop || seps.dict[loop->addr].val != NULL && seps.dict[loop->addr].val[0] == 0 && loop->start == parent->stop){
 			--loops.ptr;
 			return loops.ptr == -1 || !loops.stack[loops.ptr].bounce ? loops : loadLoop(scriptLine, scriptFile);
 		}
@@ -501,6 +501,14 @@ struct loopStack loadLoop(char *scriptLine, FILE *scriptFile){
 int retrieveToken(int *outCurs, char **outTxt, char *scriptLine, int *cursors){
 	//fprintf(stderr, "FUNCTION: RETRIEVE TOKEN called: %i %i %p %p %i %i\n", outCurs[START], outCurs[STOP], outTxt, scriptLine, cursors[START], cursors[STOP]);
 	switch (findToken(scriptLine, cursors)){
+	case MATHS:
+		*outTxt = loops.stack[loops.ptr].buff;
+		if (loops.stack[loops.ptr].type == SEP){
+			outCurs[START] = loops.stack[loops.ptr].start;
+			outCurs[STOP] = loops.stack[loops.ptr].stop;
+		}
+		else outCurs[START] = -1;
+		return FALSE;
 	case NUMBER:
 	case QUOTE:
 		outCurs[START] = cursors[START];
@@ -530,6 +538,8 @@ int retrieveToken(int *outCurs, char **outTxt, char *scriptLine, int *cursors){
 			*outTxt = vars.dict[findVar(scriptLine,cursors)].val;
 			return FALSE;
 		}
+	case TERMINATOR:
+		return -1;
 	}
 }
 
@@ -657,7 +667,14 @@ int main(int argc, char **argv){
 		else if (substringEquals("print", scriptLine, cursors)){
 			//fprintf(stderr, "PRINT command\n");
 			int status;
-			do {
+			char *buff;
+			int printCurs[2];
+			while ( (status=retrieveToken(printCurs, &buff, scriptLine, cursors)) != -1){
+				if (printCurs[START] == -1) printf("%s", buff);
+				else printSubstring(buff, printCurs[START], printCurs[STOP]);
+				if (status) free(buff);
+			}
+			/*do {
 				status = findToken(scriptLine, cursors);
 				switch (status){
 				case NUMBER:
@@ -692,7 +709,7 @@ int main(int argc, char **argv){
 					printSubstring(scriptLine, cursors[START], cursors[STOP]);
 					break;
 				}
-			} while (status != TERMINATOR);
+			} while (status != TERMINATOR);*/
 		}
 		else if (substringEquals("file", scriptLine, cursors)){
 			//fprintf(stderr, "COMMAND: FILE\n");
