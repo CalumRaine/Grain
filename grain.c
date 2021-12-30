@@ -849,46 +849,33 @@ int main(int argc, char **argv){
 			else if (status == MATHS){
 				//fprintf(stderr, "\t\tMaths mode\n");
 				float result = string2Num(vars.dict[destIndex].val);
-				fprintf(stderr, "Assigning to = %f\n", result);
 				do {
 					char op = scriptLine[cursors[START]];
 					int subCurs[2];
 					char *subTxt;
 					int toFree = retrieveToken(subCurs, &subTxt, scriptLine, cursors);
 					float newNum = subCurs[START] == -1 ? string2Num(subTxt) : substring2Num(subTxt, subCurs);
-					fprintf(stderr, "newNum %f\n", newNum);
 					if (toFree) free(subTxt);
 
 					switch(op){
 					case '+':
-						fprintf(stderr, "+\n");
 						result += newNum;
-						fprintf(stderr, "now %f\n", result);
 						break;
 					case '-':
-						fprintf(stderr, "-\n");
 						result -= newNum;
-						fprintf(stderr, "now %f\n", result);
 						break;
 					case '*':
-						fprintf(stderr, "*\n");
 						result *= newNum;
-						fprintf(stderr, "now %f\n", result);
 						break;
 					case '/':
-						fprintf(stderr, "/\n");
 						result /= newNum;
-						fprintf(stderr, "now %f\n", result);
 						break;
 					case '%':
-						fprintf(stderr, "*\n");
 						result = (int)result % (int)newNum;
-						fprintf(stderr, "now %f\n", result);
 						break;
 					}
 				} while (findToken(scriptLine, cursors) != TERMINATOR);
 				vars.dict[destIndex].val = num2String(vars.dict[destIndex].val, result);
-				fprintf(stderr, "Saving %s\n\n", vars.dict[destIndex].val);
 			}
 		}
 		//fprintf(stderr, "\n");
