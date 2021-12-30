@@ -848,34 +848,34 @@ int main(int argc, char **argv){
 			}
 			else if (status == MATHS){
 				//fprintf(stderr, "\t\tMaths mode\n");
-				float result = string2Num(vars.dict[destIndex].val);
+				float augend = string2Num(vars.dict[destIndex].val), addend;
 				do {
 					char op = scriptLine[cursors[START]];
-					int subCurs[2];
 					char *subTxt;
-					int toFree = retrieveToken(subCurs, &subTxt, scriptLine, cursors);
-					float newNum = subCurs[START] == -1 ? string2Num(subTxt) : substring2Num(subTxt, subCurs);
+					int augCurs[2];
+					int toFree = retrieveToken(augCurs, &subTxt, scriptLine, cursors);
+					addend = augCurs[START] == -1 ? string2Num(subTxt) : substring2Num(subTxt, augCurs);
 					if (toFree) free(subTxt);
 
 					switch(op){
 					case '+':
-						result += newNum;
+						augend += addend;
 						break;
 					case '-':
-						result -= newNum;
+						augend -= addend;
 						break;
 					case '*':
-						result *= newNum;
+						augend *= addend;
 						break;
 					case '/':
-						result /= newNum;
+						augend /= addend;
 						break;
 					case '%':
-						result = (int)result % (int)newNum;
+						augend = (int)augend % (int)addend;
 						break;
 					}
 				} while (findToken(scriptLine, cursors) != TERMINATOR);
-				vars.dict[destIndex].val = num2String(vars.dict[destIndex].val, result);
+				vars.dict[destIndex].val = num2String(vars.dict[destIndex].val, augend);
 			}
 		}
 		//fprintf(stderr, "\n");
