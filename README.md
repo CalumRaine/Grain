@@ -18,7 +18,7 @@ John		Smith		06/11/1982
 * Usage: `./grain script.gr`
 * Statements are terminated by a newline.
 * Comments initiated with a semicolon `;`. All remaining text on that line is ignored by the interpreter
-* `Grain` is case-sensitive.  All commands are lowercase.
+* `Grain` is case sensitive.  All commands are lowercase.
 
 ### Output: `print`
 
