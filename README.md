@@ -237,6 +237,8 @@ print input[1]
 
 Offsets are 0-indexed, thus the above example will print the _second_ line from the given file.  It could be thought of as _"Print one after the next line"_ and so `print input[0]` would print the next line.
 
+The 0<sup>th</sup> index scans from the beginning of the stream to the first occurence of `segment` _or_ the end of the stream, whichever occurs first.  This means `segment[0]` should always exist for all defined segments, even if the delimiter does not occur in the stream.
+
 A *crucial* difference between `file` and `field` segments is that `field` segments simply refer to coordinates in a `file` segment, whereas `file` segments load directly from disk, sequentially.  This traversal occurs in a forward direction only.  Therefore two calls to `print file[0]` will actually print different results because _"the next line"_ moves forward with each call.  This does not occur with `field` segments. 
 
 ```
@@ -369,3 +371,44 @@ Output:
 
 In the case of redefinition, the most recent definition is used.  Even if redefinition occurs within a loop or `if` block, the updated values will persist once outside of that block or loop.
 
+## Future Improvements
+
+### Error Messages
+
+Error checking is yet to be implemented.  `Grain` will simply crash in the event of an error.
+
+### Substring Searching
+
+Add a new conditional that allows matching of substrings.
+
+```
+in line
+	if "apple" in line
+		print line
+	fi
+out
+```
+
+This would currently require looping through each column and carrying out a string comparison.  This is limited and potentially slow.
+
+### Direct Stream Editing
+
+A segment can be copied into a variable and modified then printed.
+
+```
+var variable = column[2]
+variable += 7
+```
+
+It would be good to directly modify segments and print them inline with the rest of the stream.
+
+```
+column[2] += 7
+print *
+```
+
+This would currently require looping through all other columns before/after `column[2]` and printing those.
+
+### Single line commands from Standard Input
+
+Currently `Grain` can only be passed a file of commands, each of which are on a separate line.  It would be good to permit a semicolon terminator so commands can be written inline and piped directly into `Grain` on the command line, without need for a script file.  (This would of course require comments to be defined via `/` instead of `;`.
