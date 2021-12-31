@@ -188,16 +188,15 @@ Segments may initially be difficult to understand but should become far more int
 
 File declarators provide a filename and a field delimiter.  The given filename is automatically opened and can be parsed in your script.  `Grain` permits parsing of multiple files in one script.
 
+The delimiter defines the basic segment into which a file should be parsed.  For example, files are usually parsed line-by-line, so the newline `\n` character is the delimiter in this example.
 
-Field delimiters define the basic segment into which a file should be parsed.  For example, files are usually parsed line-by-line, so the newline `\n` character is the delimiter in this example.
-
-The example below would create a `file` segment variable called `myFile`, open "example.txt" and loading would occur up to full-stop `.` characters, which effectively parses the file sentence-by-sentence.
+The example below would create a `file` segment variable called `myFile`, then open "example.txt" and loading would occur up to period `.` characters, which effectively parses the file sentence-by-sentence.
 
 ```
 file myFile("example.txt", ".")
 ```
 
-The delimiter is optional.  If no delimiter is provided (`file newFile("example.txt")`), a newline delimiter is used by default.  If an empty delimiter is provided (`file another("example.txt", "")`) then the file would be parsed character-by-character.
+The delimiter is optional.  If no delimiter is provided (`file newFile("example.txt")`), a newline delimiter is used by default.  If an empty delimiter is provided (`file another("example.txt", "")`), the file is parsed character-by-character.
 
 Redefining a `file` segment with the same name is allowed.  The new filename and delimiter will be updated and used from thereon.  Providing the same filename in the redefinition is the equivalent of reopening the file and rescanning from the beginning.
 
@@ -239,7 +238,7 @@ Offsets must be integers.  A variable name can be provided if it represents an i
 
 Offsets are 0-indexed, thus the above example will print the _second_ line from the given file.  It could be thought of as _"Print one after the next line"_ and so `print input[0]` would print the next line.
 
-The 0<sup>th</sup> index scans from the beginning of the stream to the first occurence of the delimiter _or_ the end of the stream, whichever occurs first.  This means `segment[0]` should always exist for all defined segments, even if the delimiter does not occur in the stream.
+The 0<sup>th</sup> index scans from the beginning of the stream to the first occurence of the delimiter _or_ the end of the stream, whichever occurs first.  This means `segment[0]` should always exist for all defined segments, even if the delimiter does not occur in the stream.  The delimiter itself is *not* included in the buffer stream.
 
 A *crucial* difference between `file` and `field` segments is that `field` segments simply refer to coordinates in a `file` segment, whereas `file` segments load directly from disk, sequentially.  This traversal occurs in a forward direction only.  Therefore two calls to `print file[0]` will actually print different results because _"the next line"_ moves forward with each call.  This does not occur with `field` segments. 
 
@@ -286,7 +285,7 @@ in text
 out
 ```
 
-Both `file` and `field` segments are valid for use with the `in` command.  Particular segments can be specified with index offsets.  However using segments without an index will instantiate a loop over all occurences.  The `in` command is the _only_ place in grain where segments can be used in the absence of an index like this.
+Both `file` and `field` segments are valid for use with the `in` command.  Particular segments can be specified with index offsets.  However using segments without an index will instantiate a loop over all occurences.  The `in` command is the _only_ place in `Grain` where segments can be used in the absence of an index like this.
 
 The `out` syntax defines the end of a loop.  Indentation is *not* mandatory in `Grain` but is shown here for clarity.
 
@@ -334,14 +333,18 @@ Output:
 >>> 29 1
 >>> 22 2
 >>> 04 2
->>> 04 3
+>>> 04 2
 ```
 
 ### Conditional Statements: `if`, `elif`, `else` and `fi`
 
-Valid comparators include variable values, strings, `file` segments, `field` segments and numbers.  
+Valid comparators include variable values, strings, `file` segments, `field` segments and numbers.
+
+If both comparators can be converted to numbers, they will be treated as numbers, otherwise both comparators will be treated as text.
 
 Valid operators include equality `==`, less than `<`, greater than `>`, less than or equal `<=`, greater than or equal `>=` and not equal `!=`.
+
+In the event of text comparison, the `<` and `>` operators refer to alphabetical ordering.
 
 Should an `if` statement return false, further tests could be carried out with "else if" `elif` statements.  A final `else` statement will execute commands if all prior statements are false.
 
@@ -371,7 +374,7 @@ Output:
 
 `Grain` implements _no_ scoping.  All variables and segments are globally accessible throughout the script from when they are defined.  
 
-In the case of redefinition, the most recent definition is used.  Even if redefinition occurs within a loop or `if` block, the updated values will persist once outside of that block or loop.
+In the case of redefinition, the most recent definition is used.  Even if redefinition occurs within an `in` loop or `if` block, the updated values will persist once outside of that block or loop.
 
 ## Future Improvements
 
@@ -385,8 +388,8 @@ Add a new conditional that allows matching of substrings.
 
 ```
 in line
-	if "apple" in line
-		print line
+	if "apple" in *
+		print *
 	fi
 out
 ```
