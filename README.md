@@ -199,7 +199,7 @@ file myFile("example.txt", ".")
 
 The delimiter is optional.  If no delimiter is provided (`file newFile("example.txt")`), a newline delimiter is used by default.  If an empty delimiter is provided (`file another("example.txt", "")`) then the file would be parsed character-by-character.
 
-Redefining a file segment with the same name is allowed.  The new filename and delimiter will be updated and used from thereon.  Providing the same filename in the redefinition is the equivalent of reopening the file and rescanning from the beginning.
+Redefining a `file` segment with the same name is allowed.  The new filename and delimiter will be updated and used from thereon.  Providing the same filename in the redefinition is the equivalent of reopening the file and rescanning from the beginning.
 
 #### Field Segments
 
@@ -212,6 +212,8 @@ field separator("/")
 ```
 
 If no delimiter is provided (`field second()`) then whitespace is used as the delimiter.  Whitespace is defined as a series of one or more spaces, tabs or newline characters.  If any empty delimiter is provided (`field letters("")`) then each character is treated individually.
+
+Redefining a `field` segment with the same name is allowed.  The provided delimiter will be updated and used from thereon.
 
 #### Delimiters
 
@@ -331,7 +333,7 @@ Output:
 >>> 04 3
 ```
 
-#### Conditional Statements: `if`, `elif`, `else` and `fi`
+### Conditional Statements: `if`, `elif`, `else` and `fi`
 
 Valid comparators include variable values, strings, `file` segments, `field` segments and numbers.  
 
@@ -360,3 +362,10 @@ print "books.\n"
 Output:
 >>> You have lots of books.
 ```
+
+### Scope of Variables & Segments
+
+`Grain` implements _no_ scoping.  All variables and segments are globally accessible throughout the script from when they are defined.  
+
+In the case of redefinition, the most recent definition is used.  Even if redefinition occurs within a loop or `if` block, the updated values will persist even once out of the block/loop.
+
