@@ -367,5 +367,5 @@ Output:
 
 `Grain` implements _no_ scoping.  All variables and segments are globally accessible throughout the script from when they are defined.  
 
-In the case of redefinition, the most recent definition is used.  Even if redefinition occurs within a loop or `if` block, the updated values will persist once outside of the block/loop.
+In the case of redefinition, the most recent definition is used.  Even if redefinition occurs within a loop or `if` block, the updated values will persist once outside of that block or loop.
 
