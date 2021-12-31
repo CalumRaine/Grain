@@ -210,7 +210,7 @@ The example below declares a field segment variable that breaks a stream at forw
 field separator("/")
 ```
 
-If no delimiter is provided (`field second()`) then whitespace is used as the delimiter.  Whitespace is defined as a series of one or more spaces, tabs or newline characters.  If any empty delimiter is provided (`field letters("")`) then each character is treated individually.
+If no delimiter is provided (`field second()`) then whitespace is used as the delimiter.  Whitespace is defined as a series of one or more spaces, tabs or newline characters.  If an empty delimiter is provided (`field letters("")`) then each character is treated individually.
 
 Redefining a `field` segment with the same name is allowed.  The provided delimiter will be updated and used from thereon.
 
@@ -240,7 +240,7 @@ Offsets are 0-indexed, thus the above example will print the _second_ line from 
 
 The 0<sup>th</sup> index scans from the beginning of the stream to the first occurence of the delimiter _or_ the end of the stream, whichever occurs first.  This means `segment[0]` should always exist for all defined segments, even if the delimiter does not occur in the stream.  The delimiter itself is *not* included in the buffer stream.
 
-A *crucial* difference between `file` and `field` segments is that `field` segments simply refer to coordinates in a `file` segment, whereas `file` segments load directly from disk, sequentially.  This traversal occurs in a forward direction only.  Therefore two calls to `print file[0]` will actually print different results because _"the next line"_ moves forward with each call.  This does not occur with `field` segments. 
+A *crucial* difference between `file` and `field` segments is that `field` segments simply refer to coordinates in a `file` segment, whereas `file` segments load directly from disk, sequentially.  This traversal occurs in a forward direction only.  Therefore two calls to `print file[0]` will print different results because _"the next line"_ moves forward with each call.  This does not occur with `field` segments. 
 
 ```
 file thisFile("example.txt")
