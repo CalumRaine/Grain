@@ -235,9 +235,11 @@ file input("example.txt")
 print input[1]
 ```
 
+Offsets must be integers.  A variable name can be provided if it represents an integer.  A string may be provided if it can successfully be converted to an integer.  If a floating point number is provided, the number will be used after discarding the fractional part (no rounding will occur).
+
 Offsets are 0-indexed, thus the above example will print the _second_ line from the given file.  It could be thought of as _"Print one after the next line"_ and so `print input[0]` would print the next line.
 
-The 0<sup>th</sup> index scans from the beginning of the stream to the first occurence of `segment` _or_ the end of the stream, whichever occurs first.  This means `segment[0]` should always exist for all defined segments, even if the delimiter does not occur in the stream.
+The 0<sup>th</sup> index scans from the beginning of the stream to the first occurence of the delimiter _or_ the end of the stream, whichever occurs first.  This means `segment[0]` should always exist for all defined segments, even if the delimiter does not occur in the stream.
 
 A *crucial* difference between `file` and `field` segments is that `field` segments simply refer to coordinates in a `file` segment, whereas `file` segments load directly from disk, sequentially.  This traversal occurs in a forward direction only.  Therefore two calls to `print file[0]` will actually print different results because _"the next line"_ moves forward with each call.  This does not occur with `field` segments. 
 
@@ -412,3 +414,23 @@ This would currently require looping through all other columns before/after `col
 ### Single line commands from Standard Input
 
 Currently `Grain` can only be passed a file of commands, each of which are on a separate line.  It would be good to permit a semicolon terminator so commands can be written inline and piped directly into `Grain` on the command line, without need for a script file.  (This would of course require comments to be defined via `/` instead of `;`.
+
+### Allow strings and variables in the `in` command
+
+Array-like looping behaviour would be enabled if the following syntax was permitted.
+
+```
+var line = "one_two_three_four"
+field delim("_")
+field column()
+in "0 1 2 3".column
+	print line.delim[column] "\n"
+out
+```
+```
+Output:
+>>> one
+>>> two
+>>> three
+>>> four
+```
