@@ -2,11 +2,11 @@
 
 #### A file parsing scripting language
 
-Scanning files to extract or modify columns is a common task.  Existing languages, such as `awk`, do this well.  While the user _can_ declare which character string should be used to distinguish column fields (such as whitespace or commas), a file with multiple field delimiters presents a challenge.  For example, extracting the day component from the date column below requires both whitespace delimiting and forward slash delimiting.
+Scanning files to extract or modify columns is a common task.  Existing languages, such as `awk`, do this well.  While the user _can_ declare which character string should be used to distinguish column fields (such as whitespace or commas), a file with multiple field delimiters presents a challenge.  For example, extracting the "day" component from the Date column below requires both whitespace delimiting and forward slash delimiting.
 
 ```
-Forename	Surname Date
-John		Smith	06/11/1982
+Forename	Surname 	Date
+John		Smith		06/11/1982
 ```
 
 `Grain` is primarily designed with this challenge in mind.
@@ -16,13 +16,13 @@ John		Smith	06/11/1982
 ### General Syntax
 
 * Usage: `./grain script.gr`
-* Statements are terminated by a newline
-* Comments are initiated with a semicolon `;` and all remaining text on that line is ignored by the command interpreter
-* `Grain` is case-sensitive.  All commands are lowercase
+* Statements are terminated by a newline.
+* Comments initiated with a semicolon `;`. All remaining text on that line is ignored by the interpreter
+* `Grain` is case-sensitive.  All commands are lowercase.
 
 ### Output: `print`
 
-Items following a `print` command will be output to the console.  This includes strings, numbers and variable values.  Valid strings are surrounded by matching double quotes `"`, single quotes `'` or backticks.  Within this outer pair of quotes, quote characters of the other two types can be freely used.
+Items following a `print` command will be output to the console.  This includes strings, numbers, variable values and segments - the latter of which are described below.  Valid strings are surrounded by matching double quotes `"`, single quotes `'` or backticks \`.  Within this outer pair of quotes, quote characters of the other two types can be freely used.  Spurious quotation marks can be escaped with a backslash `\` if necessary.
 
 Escape sequences (such as tab `\t` and `\n` characters) are automatically converted.  The `print` command does *not* append a newline by default.  Multiple adjacent items separated by whitespace can be printed in one command.
 
@@ -35,15 +35,15 @@ Output:
 >>> My age is 87.
 ```
 
-The asterisk `*` is interpreted by `print` as a special character that refers to the current before (discussed later).
+The asterisk `*` is interpreted by `print` as a special character that refers to the current buffer	 (discussed later).
 
 Floating point numbers are printed up to five decimal places; trailing zeroes are not printed.
 
 ### Variable Declaration: `var`
 
-Variables are declared with the `var` command.  Valid variable names contain only alphanumeric characters but the _first_ character cannot be a number.  The underscore `_` character is a valid character in variable names.  `Grain` is case-sensitive, therefore `apple` and `Apple` would be two different variables.
+Variables are declared with the `var` command.  Valid variable names contain only alphanumeric characters but the _first_ character cannot be a number.  The underscore `_` character is also a valid character in variable names.  `Grain` is case sensitive, therefore `apple` and `Apple` are two different variables.
 
-`Grain` is a loosely typed language; all variables are referred to as `var`.  Data types are inferred at _usage_ time, not declaration time.  One variable could therefore be treated both numerically _and_ as a text string in different usage contexts throughout its lifetime.
+`Grain` is a loosely typed language; all variables are referred to as `var`.  Data types are inferred at _usage_ time, not declaration time.  One variable could therefore be treated both numerically _and_ textually in different usage contexts throughout its lifetime.
 
 ```
 var foo
@@ -88,8 +88,6 @@ Output:
 >>> hello
 ```
 
-There are two assignment modes: string mode and maths mode.  A mixture of maths mode and string mode can *not* be used within the same command.
-
 Variable declaration is carried out from left to right, making the follow example valid.
 
 ```
@@ -101,10 +99,11 @@ Output:
 >>> hello
 ```
 
+There are two assignment modes: string mode and maths mode.  These examples have demonstrated string mode, using the bare assignment operator.  Prepending a mathematical operator to the assignment operator initiates maths mode (shown later).  A mixture of maths mode and string mode can *not* be used within the same command.
 
-#### Strings & Concatenation
+#### String Mode & Concatenation
 
-Adjacent values after the assignment operator will be concatenated.  Do *not* use the plus `+` symbol to concatenate strings.  The variable's own name can be included in the assignment, such as in the append example below.
+Adjacent values after the assignment operator are concatenated.  Do *not* use the plus `+` symbol to concatenate strings.  The variable's own name can be included in the assignment, such as in the append example below.
 
 ```
 var foo = "hello"
@@ -117,9 +116,9 @@ Output:
 
 ```
 
-#### Arithmetic
+#### Maths Mode
 
-Prepending the assignment operator with a mathematical operator enters maths mode: `+= -= *= /= %=`.  Strings are automatically converted to numbers when maths mode is instigated.  Suitable strings must only contain numerical characters or a decimal point.  `Grain` supports floating point arithmetic up to five decimal places.
+Prepending the assignment operator with a mathematical operator enters maths mode: `+= -= *= /= %=`.  Strings are automatically converted to numbers when maths mode is initiated.  Suitable strings must only contain numerical characters or a decimal point.  `Grain` supports floating point arithmetic up to five decimal places.  Note that the modulo `%` operator can only be used on whole integers.  If a modulo attempt is made with a floating point decimal, the fractional part will be ignored (no rounding will take place).
 
 ```
 var foo = "Result: ", bar = 4
@@ -142,18 +141,6 @@ print foo "\n"
 Output:
 >>> 1
 ```
-
-Adjacent numbers, separated by whitespace without mathematical operators, will be treated as strings and undergo concatenation.
-
-```
-var foo = 1 1 "\n"
-print foo
-```
-```
-Output:
->>> 11
-```
-
 As variables are initialised to empty, mathematical operations can be carried out in the declaration.
 
 ```
@@ -178,11 +165,22 @@ Output:
 >>> bar = 6
 ```
 
-Stream segments can also included in both maths mode and string mode variable assignments (below).
+Adjacent numbers, separated by whitespace without mathematical operators, will be treated as strings and undergo concatenation.
+
+```
+var foo = 1 1 "\n"
+print foo
+```
+```
+Output:
+>>> 11
+```
+
+Stream segments can also be included in maths mode and string mode variable assignments (below).
 
 ### Stream Segments
 
-A stream refers to text being scanned from a file.  A segment refers to a portion of that file stream.  Files are often parsed line-by-line; a line is therefore an example of a segment.  Lines are often scanned column-by-column; a column is another example of a segment.  `Grain` has `file` and `field` segments.
+A stream refers to text being scanned.  A segment refers to a portion of that stream.  Files are often parsed line-by-line; a line is therefore an example of a segment.  Lines are often scanned column-by-column; a column is another example of a segment.  `Grain` has `file` and `field` segments.
 
 Segments may initially be difficult to understand but should become far more intuitive once learning about the `in` command later.
 
@@ -193,13 +191,15 @@ File declarators provide a filename and a field delimiter.  The given filename i
 
 Field delimiters define the basic segment into which a file should be parsed.  For example, files are usually parsed line-by-line, so the newline `\n` character is the delimiter in this example.
 
-The example below would create a `file` segment variable called `myFile`, open "example.txt" and loading would occur up to full-stop `.` characters - effectively parsing the file sentence-by-sentence.
+The example below would create a `file` segment variable called `myFile`, open "example.txt" and loading would occur up to full-stop `.` characters, which effectively parses the file sentence-by-sentence.
 
 ```
 file myFile("example.txt", ".")
 ```
 
 The delimiter is optional.  If no delimiter is provided (`file newFile("example.txt")`), a newline delimiter is used by default.  If an empty delimiter is provided (`file another("example.txt", "")`) then the file would be parsed character-by-character.
+
+Redefining a file segment with the same name is allowed.  The new filename and delimiter will be updated and used from thereon.  Providing the same filename in the redefinition is the equivalent of reopening the file and rescanning from the beginning.
 
 #### Field Segments
 
@@ -211,7 +211,7 @@ The example below declares a field segment variable that breaks a stream at forw
 field separator("/")
 ```
 
-If no delimiter is provided (`field second()`) then any whitespace is used as the delimiter.  Whitespace is defined by any string consisting of one or more space, tab or newline characters.  If any empty delimiter is provided (`field letters("")`) then each character is treated individually.
+If no delimiter is provided (`field second()`) then whitespace is used as the delimiter.  Whitespace is defined as a series of one or more spaces, tabs or newline characters.  If any empty delimiter is provided (`field letters("")`) then each character is treated individually.
 
 #### Delimiters
 
@@ -233,9 +233,39 @@ file input("example.txt")
 print input[1]
 ```
 
-Offsets are 0-indexed, thus the above example will print the _second_ line from the given file.  It could be thought of as _"Print one after the next line"_, therefore `print input[0]` would print the next line.
+Offsets are 0-indexed, thus the above example will print the _second_ line from the given file.  It could be thought of as _"Print one after the next line"_ and so `print input[0]` would print the next line.
 
 A *crucial* difference between `file` and `field` segments is that `field` segments simply refer to coordinates in a `file` segment, whereas `file` segments load directly from disk, sequentially.  This traversal occurs in a forward direction only.  Therefore two calls to `print file[0]` will actually print different results because _"the next line"_ moves forward with each call.  This does not occur with `field` segments. 
+
+```
+file thisFile("example.txt")
+print thisFile[1] "\n" thisFile[0] "\n"
+```
+```
+Input File:
+this is the first line
+this is the second line
+this is the third line
+```
+```
+Output:
+>>> this is the second line
+>>> this is the third line
+```
+
+As mentioned, redefining a `file` segment with the same filename will reopen the file, thus the example above becomes:  
+
+```
+file thisFile("example.txt")
+print thisFile[1] "\n" 
+file thisFile("example.txt")
+print thisFile[1] "\n"
+```
+```
+Output:
+>>> this is the second line
+>>> this is the second line
+```
 
 ### Buffers & Loops: `in`
 
@@ -250,7 +280,7 @@ in text
 out
 ```
 
-Both `file` and `field` segments are valid for use with the `in` command.  Particular segments can be specified with index offsets.  However using segments without an index will instantiate a loop over all occurences.  The `in` command is the _only_ place in grain where segments can be used without an offset like this.
+Both `file` and `field` segments are valid for use with the `in` command.  Particular segments can be specified with index offsets.  However using segments without an index will instantiate a loop over all occurences.  The `in` command is the _only_ place in grain where segments can be used in the absence of an index like this.
 
 The `out` syntax defines the end of a loop.  Indentation is *not* mandatory in `Grain` but is shown here for clarity.
 
