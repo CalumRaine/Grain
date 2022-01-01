@@ -579,47 +579,61 @@ int comparator(char *scriptLine, int *cursors){
 	int cursA[2], cursB[2];
 	char *txtA, *txtB;
 	
-	int freeA = retrieveToken(cursA, &txtA, scriptLine, cursors);
+	int freeA = retrieveToken(cursA, &txtA, scriptLine, cursors), freeB, result;
 
 	int operator = getNextToken(scriptLine, cursors);
-	if (operator > 5){
-		fprintf(stderr, "Comparator %i not recognised\n", operator);
-		exit(1);
+	if (operator == VARIABLE){
+		int inc = substringEquals("inc", scriptLine, cursors);
+		freeB = retrieveToken(cursB, &txtB, scriptLine, cursors);
+		
+		// getNextField() requires txtA start/stop coords
+		if (cursA[START] == STRING) for (cursA[STOP]=0; txtA[cursA[STOP]] != 0; ++cursA[STOP]);
+
+		// getNextField() requires txtB as null-terminated string
+		char swap;
+		if (cursB[START] != STRING) {
+			swap = txtB[cursB[STOP]];
+			txtB[cursB[STOP]] = 0;
+		}
+
+		result = (getNextField(txtA, &txtB[cursB[START]], cursA[START] == -1 ? 0 : cursA[START], cursA[STOP]) != NOT_FOUND);
+		if (!inc) result = !result;
+		if (cursB[START] != STRING) txtB[cursB[STOP]] = swap;
 	}
-
-	int freeB = retrieveToken(cursB, &txtB, scriptLine, cursors);
-
-	int result = compareTokens(txtA, cursA, txtB, cursB);
-	if (freeA) free(txtA);
-	if (freeB) free(txtB);
+	else {
+		freeB = retrieveToken(cursB, &txtB, scriptLine, cursors);
+		result = compareTokens(txtA, cursA, txtB, cursB);
+		switch (operator){
+			case LT:
+				result = result < 0;
+				break;
+			case LE:
+				result = result <= 0;
+				break;
+			case GT:
+				result = result > 0;
+				break;
+			case GE:
+				result = result >= 0;
+				break;
+			case EQ:
+				result = result == 0;
+				break;
+			case NE:
+				result = result != 0;
+				break;
+			default:
+				fprintf(stderr, "Comparator %i not recognised\n", operator);
+				exit(1);
+		}
+	}
 
 	int andFlag=FALSE, orFlag=FALSE;
 	if ( getNextToken(scriptLine, cursors) != TERMINATOR && (andFlag=substringEquals("and", scriptLine, cursors)) == FALSE ) 
 		orFlag = substringEquals("or", scriptLine, cursors);
 
-	switch (operator){
-		case LT:
-			result = result < 0;
-			break;
-		case LE:
-			result = result <= 0;
-			break;
-		case GT:
-			result = result > 0;
-			break;
-		case GE:
-			result = result >= 0;
-			break;
-		case EQ:
-			result = result == 0;
-			break;
-		case NE:
-			result = result != 0;
-			break;
-		default:
-			fprintf(stderr, "Unrecognised operator\n");
-			exit(1);
-	}
+	if (freeA) free(txtA);
+	if (freeB) free(txtB);
 
 	if (result == TRUE) return andFlag ? comparator(scriptLine, cursors) : TRUE;
 	else return orFlag ? comparator(scriptLine, cursors) : FALSE;

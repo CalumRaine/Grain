@@ -391,6 +391,7 @@ Error checking is yet to be implemented.  `Grain` will simply crash in the event
 
 ### Substring Searching
 
+(THIS HAS NOW BEEN IMPLEMENTED, DOCUMENTATION SHOULD BE UPDATED WITH `inc` AND `exc` COMMANDS)
 Add a new conditional that allows matching of substrings.
 
 ```
