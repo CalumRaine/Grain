@@ -19,6 +19,7 @@ John		Smith		06/11/1982
 * Statements are terminated by a newline.
 * Comments initiated with a semicolon `;`. All remaining text on that line is ignored by the interpreter
 * `Grain` is case sensitive.  All commands are lowercase.
+* The `exit` command will immediately quit from anywhere in the script.
 
 ### Output: `print`
 
@@ -336,6 +337,10 @@ Output:
 >>> 04 2
 ```
 
+The `break` command causes the program to immediately exit the current loop.
+
+The `cont` (continue) command causes the program to immediately begin executing the next iteration of the current loop.
+
 ### Conditional Statements: `if`, `elif`, `else` and `fi`
 
 Valid comparators include variable values, strings, `file` segments, `field` segments and numbers.
@@ -346,7 +351,9 @@ Valid operators include equality `==`, less than `<`, greater than `>`, less tha
 
 In the event of text comparison, the `<` and `>` operators refer to alphabetical ordering.
 
-Should an `if` statement return false, further tests could be carried out with "else if" `elif` statements.  A final `else` statement will execute commands if all prior statements are false.
+There are two further operands, `inc` (includes) and `exc` (excludes) to check whether a string contains or does not contain the given substring.
+
+Should an `if` statement return false, further tests can be carried out with "else if" `elif` statements.  A final `else` statement will execute commands if all prior statements are false.
 
 All conditional blocks must be terminated with the `fi` statement.
 
