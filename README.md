@@ -385,10 +385,6 @@ In the case of redefinition, the most recent definition is used.  Even if redefi
 
 ## Future Improvements
 
-### Error Messages
-
-Error checking is yet to be implemented.  `Grain` will simply crash in the event of an error.
-
 ### Direct Stream Editing
 
 A segment can be copied into a variable and modified then printed.
