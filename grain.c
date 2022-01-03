@@ -310,20 +310,20 @@ char *loadFile(char *buff, struct fileDict file, int *length, int index){
 	// Skip "index" number of "file" records and load next into "buff"
 	// Saves buff length into *length
 
-	int buffCap, lastCap, end, read;
+	int buffCap, cursor, found, in;
 	for (buffCap=0, index+=1; index; buffCap=0, --index){
 		do {
-			lastCap = buffCap;
+			cursor = buffCap;
 			buffCap += READ_SIZE;
 			buff = realloc(buff, (buffCap+1) * sizeof(char));
-			read = fread(&buff[lastCap], sizeof(char), READ_SIZE, file.fp);
-			end = getNextField(buff, file.delimiter, lastCap, lastCap + read);
-		} while (end == NOT_FOUND  &&  read == READ_SIZE);
+			in = fread(&buff[cursor], sizeof(char), READ_SIZE, file.fp);
+			found = getNextField(buff, file.delimiter, cursor, cursor + in);
+		} while (found == NOT_FOUND  &&  in == READ_SIZE);
 
-		if (end != NOT_FOUND) fseek(file.fp, (long)(0 - buffCap + end + file.len), SEEK_CUR);
+		if (found != NOT_FOUND) fseek(file.fp, (long)(0 - (feof(file.fp) ? in : buffCap) + found + file.len), SEEK_CUR);
 	}
 
-	*length = (end == NOT_FOUND ? lastCap + read : end);
+	*length = (found == NOT_FOUND ? cursor + in : found);
 
 	if (feof(file.fp) && *length==0){
 		free(buff);
@@ -403,6 +403,10 @@ char *varStrAss(char *scriptLine, int *cursors){
 	char *buff = NULL;
 	for (int status=getNextToken(scriptLine, cursors); status != TERMINATOR && status != COMMA; status = scriptLine[cursors[STOP]] == ',' ? COMMA : getNextToken(scriptLine, cursors)){
 		if (status == QUOTE || status == NUMBER) buff = substringJoin(buff, scriptLine, cursors[START], cursors[STOP]);
+		else if (status == ASTERISK) {
+			struct loopStruct *loop = &loops.stack[loops.ptr];
+			buff = (loop->type == FIELD_SEG ? substringJoin(buff, loop->buff, loop->start, loop->stop) : stringJoin(buff, loop->buff));
+		}
 		else if (scriptLine[cursors[STOP]] == '['){
 			int addr = findSep(scriptLine, cursors);
 			if (addr != NOT_FOUND ) {
@@ -431,7 +435,6 @@ struct loopStack loadLoop(char *scriptLine, FILE *scriptFile);
 struct loopStack resetLoop(char *scriptLine, FILE *scriptFile){
 	// Setup loopStruct cursors 
 	// Use resetLoop on the way up the chain, use loadLoop on the way down the chain
-	// Error: This will not work on file segments
 	
 	struct loopStruct *loop = &loops.stack[loops.ptr];
 	if (loop->type == FIELD_SEG){
