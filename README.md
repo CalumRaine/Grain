@@ -351,7 +351,7 @@ Valid operators include equality `==`, less than `<`, greater than `>`, less tha
 
 In the event of text comparison, the `<` and `>` operators refer to alphabetical ordering.
 
-There are two further operands, `inc` (includes) and `exc` (excludes) to check whether a string contains or does not contain the given substring.
+There are two further operands, `inc` (includes) and `exc` (excludes) to check whether string A contains or does not contain the given substring B.
 
 Should an `if` statement return false, further tests can be carried out with "else if" `elif` statements.  A final `else` statement will execute commands if all prior statements are false.
 
@@ -388,21 +388,6 @@ In the case of redefinition, the most recent definition is used.  Even if redefi
 ### Error Messages
 
 Error checking is yet to be implemented.  `Grain` will simply crash in the event of an error.
-
-### Substring Searching
-
-(THIS HAS NOW BEEN IMPLEMENTED, DOCUMENTATION SHOULD BE UPDATED WITH `inc` AND `exc` COMMANDS)
-Add a new conditional that allows matching of substrings.
-
-```
-in line
-	if "apple" in *
-		print *
-	fi
-out
-```
-
-This would currently require looping through each column and carrying out a string comparison.  This is limited and potentially slow.
 
 ### Direct Stream Editing
 
