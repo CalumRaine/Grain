@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define READ_SIZE 500
 enum position	{START, STOP};
@@ -308,6 +309,7 @@ int skipFields(char *txt, struct fieldDict *field, int index, int from, int to){
 char *loadFile(char *buff, struct fileDict file, int *length, int index){
 	// Skip "index" number of "file" records and load next into "buff"
 	// Saves buff length into *length
+
 	int buffCap, lastCap, end, read;
 	for (buffCap=0, index+=1; index; buffCap=0, --index){
 		do {
@@ -318,12 +320,12 @@ char *loadFile(char *buff, struct fileDict file, int *length, int index){
 			end = getNextField(buff, file.delimiter, lastCap, lastCap + read);
 		} while (end == NOT_FOUND  &&  read == READ_SIZE);
 
-		if (end != NOT_FOUND) fseek(file.fp, (long)(0 - read + end + file.len), SEEK_CUR);
+		if (end != NOT_FOUND) fseek(file.fp, (long)(0 - buffCap + end + file.len), SEEK_CUR);
 	}
 
-	*length = (end == NOT_FOUND ? lastCap + read : lastCap + end);
+	*length = (end == NOT_FOUND ? lastCap + read : end);
 
-	if (feof(file.fp)){
+	if (feof(file.fp) && *length==0){
 		free(buff);
 		return NULL;
 	}
@@ -657,13 +659,14 @@ int main(int argc, char **argv){
 	fields.count = 0, fields.dict = NULL;
 	files.count = 0, files.dict = NULL;
 	loops.ptr = -1, loops.cap = 0, loops.stack = NULL;
-
+	clock_t clockStart;
 	char scriptLine[READ_SIZE + 1];
 	FILE *scriptFile = fopen(argv[1], "r");
 	for ( fgets(scriptLine, READ_SIZE + 1, scriptFile) ; !feof(scriptFile); fgets(scriptLine, READ_SIZE + 1, scriptFile) ) {
 		int cursors[2] = {0, -1};
 		if (getNextToken(scriptLine, cursors) == TERMINATOR) continue;
 		else if (substringEquals("var", scriptLine, cursors)){
+			//clockStart = clock();
 			do {
 				getNextToken(scriptLine, cursors);
 				int addr = findVar(scriptLine, cursors);
@@ -686,8 +689,10 @@ int main(int argc, char **argv){
 					vars.dict[addr].val[0] = 0;
 				}
 			} while (scriptLine[cursors[START]] == ',' || scriptLine[cursors[STOP]] == ','); // Multiple comma-separated var declarations
+//			fprintf(stderr, "VAR took %ld ticks\n", clock() - clockStart);
 		}
 		else if (substringEquals("print", scriptLine, cursors)){
+			//clockStart = clock();
 			char *buff;
 			int freeBuff, printCurs[2];
 			while ( (freeBuff=retrieveToken(printCurs, &buff, scriptLine, cursors)) != TERMINATOR){
@@ -695,8 +700,10 @@ int main(int argc, char **argv){
 				else printSubstring(buff, printCurs[START], printCurs[STOP]);
 				if (freeBuff == TRUE) free(buff);
 			}
+//			fprintf(stderr, "PRINT took %ld ticks\n", clock() - clockStart);
 		}
 		else if (substringEquals("file", scriptLine, cursors)){
+			//clockStart = clock();
 			// Get name
 			getNextToken(scriptLine, cursors);
 
@@ -741,8 +748,10 @@ int main(int argc, char **argv){
 				file->delimiter[0] = '\n';
 				file->delimiter[1] = 0;
 			}
+//			fprintf(stderr, "FILE took %ld ticks\n", clock()-clockStart);
 		}
 		else if (substringEquals("field", scriptLine, cursors)){
+			//clockStart = clock();
 			// Get name
 			getNextToken(scriptLine, cursors);
 			int addr = findSep(scriptLine, cursors);
@@ -768,8 +777,10 @@ int main(int argc, char **argv){
 				field->len = 0;
 				field->val = NULL;
 			}
+//			fprintf(stderr, "FIELD took %ld ticks\n", clock()-clockStart);
 		}
 		else if (substringEquals("in", scriptLine, cursors)){
+			//clockStart = clock();
 			do {
 				if (++loops.ptr == loops.cap){
 					++loops.cap;
@@ -811,19 +822,29 @@ int main(int argc, char **argv){
 					else if (substringEquals("out", scriptLine, cursors)) --loopCount;
 				}
 			}
+//			fprintf(stderr, "IN took %ld ticks\n", clock()-clockStart);
 		}
 		else if (substringEquals("out", scriptLine, cursors) || substringEquals("cont", scriptLine, cursors)){
+			//clockStart = clock();
 			loops = loadLoop(scriptLine, scriptFile);
+			//fprintf(stderr, "OUT took %ld ticks\n", clock()-clockStart);
 		}
 		else if (substringEquals("if", scriptLine, cursors)){
+			//clockStart = clock();
 			while (comparator(scriptLine, cursors) == FALSE   &&   nextIf(scriptLine, scriptFile, cursors) == FALSE);
+			//fprintf(stderr, "IF took %ld ticks\n", clock()-clockStart);
 		}
 		else if (substringEquals("elif", scriptLine, cursors) || substringEquals("else", scriptLine, cursors)){
+			//clockStart = clock();
 			for (fgets(scriptLine, READ_SIZE + 1, scriptFile) ; substringEquals("fi", scriptLine, cursors) == FALSE; fgets(scriptLine, READ_SIZE + 1, scriptFile), cursors[STOP]=-1, getNextToken(scriptLine, cursors));
+			//fprintf(stderr, "ELIF took %ld ticks\n", clock()-clockStart);
 		}
 		else if (substringEquals("fi", scriptLine, cursors)){
+			//clockStart = clock();
+			//fprintf(stderr, "FI took %ld ticks\n", clock()-clockStart);
 		}
 		else if (substringEquals("break", scriptLine, cursors)){
+			//clockStart = clock();
 			do {
 				if (loops.stack[loops.ptr].type == FILE_SEG) free(loops.stack[loops.ptr].buff);
 			} while ( --loops.ptr >= 0 && loops.stack[loops.ptr].chain == TRUE);
@@ -835,8 +856,10 @@ int main(int argc, char **argv){
 				if (substringEquals("in", scriptLine, cursors)) ++loopCount;
 				else if (substringEquals("out", scriptLine, cursors)) --loopCount;
 			}
+			//fprintf(stderr, "BREAK took %ld ticks\n", clock()-clockStart);
 		}
 		else {
+			//clockStart = clock();
 			int destAddr = findVar(scriptLine, cursors);
 			if (scriptLine[cursors[STOP]] == '=' || getNextToken(scriptLine, cursors) == ASSIGNMENT){
 				char *newVar = varStrAss(scriptLine, cursors);
@@ -872,6 +895,7 @@ int main(int argc, char **argv){
 				} while (getNextToken(scriptLine, cursors) != TERMINATOR);
 				vars.dict[destAddr].val = num2String(vars.dict[destAddr].val, augend);
 			}
+			//fprintf(stderr, "ASSIGN took %ld ticks\n", clock()-clockStart);
 		}
 	}
 	return 0;
