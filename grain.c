@@ -20,7 +20,7 @@ struct fileDict {
 struct fileStruct {
 	int count;
 	struct fileDict *dict;
-} files;
+} fileSegs;
 
 struct varDict {
 	char *key;
@@ -41,7 +41,7 @@ struct fieldDict {
 struct fieldStruct {
 	int count;
 	struct fieldDict *dict;
-} fields;
+} fieldSegs;
 
 struct loopStruct {
 	int type; 	// 0 = file  ; 1 = field
@@ -233,15 +233,15 @@ int findVar(char *txt, int *cursors){
 	return NOT_FOUND;
 }
 
-int findFile(char *txt, int *cursors){
+int findFileSeg(char *txt, int *cursors){
 	// Returns index of file in fileDict where key matches txt substring.  Or -1
-	for (int f=0; f < files.count; ++f) if (substringEquals(files.dict[f].key, txt, cursors)) return f;
+	for (int f=0; f < fileSegs.count; ++f) if (substringEquals(fileSegs.dict[f].key, txt, cursors)) return f;
 	return NOT_FOUND;
 }
 
-int findSep(char *txt, int *cursors){
+int findFieldSeg(char *txt, int *cursors){
 	// Returns index of field in fieldDict where key matches txt substring.  Or -1
-	for (int s=0; s < fields.count; ++s) if (substringEquals(fields.dict[s].key, txt, cursors)) return s;
+	for (int s=0; s < fieldSegs.count; ++s) if (substringEquals(fieldSegs.dict[s].key, txt, cursors)) return s;
 	return NOT_FOUND;
 }
 
@@ -301,7 +301,7 @@ int getNextField(char *txt, char *delimiter, int start, int stop){
 }
 
 int skipFields(char *txt, struct fieldDict *field, int index, int from, int to){
-	// Load field position after skipping "index" number of fields
+	// Load field position after skipping "index" number of fieldSegs
 	while (index-- && (from = getNextField(txt, field->val, from, to)) != -1) from = (field->val == NULL ? skipWhitespace(txt, from) : from + field->len) ;
 	return from;
 }
@@ -398,42 +398,6 @@ char *stringJoin(char *dest, char *src){
 	return dest;
 }
 
-char *varStrAss(char *scriptLine, int *cursors){
-	// Assign multiple concatenated strings to a variable
-	char *buff = NULL;
-	for (int status=getNextToken(scriptLine, cursors); status != TERMINATOR && status != COMMA; status = scriptLine[cursors[STOP]] == ',' ? COMMA : getNextToken(scriptLine, cursors)){
-		if (status == QUOTE || status == NUMBER) buff = substringJoin(buff, scriptLine, cursors[START], cursors[STOP]);
-		else if (status == ASTERISK) {
-			struct loopStruct *loop = &loops.stack[loops.ptr];
-			buff = (loop->type == FIELD_SEG ? substringJoin(buff, loop->buff, loop->start, loop->stop) : stringJoin(buff, loop->buff));
-		}
-		else if (scriptLine[cursors[STOP]] == '['){
-			int addr = findSep(scriptLine, cursors);
-			if (addr != NOT_FOUND ) {
-				getNextToken(scriptLine, cursors);
-				struct loopStruct *loop = &loops.stack[loops.ptr];
-				int start = skipFields(loop->buff, &fields.dict[addr], (int)token2Num(scriptLine, cursors) , loop->start, loop->stop);
-				if (start == NOT_FOUND){
-					fprintf(stderr, "ERROR: field segment '%s[%i]' is out of range.\n", fields.dict[addr].key, (int)token2Num(scriptLine, cursors));
-					exit(1);
-				}
-				int stop = getNextField(loop->buff, fields.dict[addr].val, start, loop->stop);
-				if (stop == NOT_FOUND) stop = loop->stop;
-				buff = substringJoin(buff, loop->buff, start, stop);
-			}
-			else {
-				addr = findFile(scriptLine, cursors);
-				getNextToken(scriptLine, cursors);
-				char *string = loadFile(NULL, files.dict[addr], &addr, (int)token2Num(scriptLine, cursors));
-				buff = stringJoin(buff, string);
-				free(string);
-			}
-		}
-		else buff = stringJoin(buff, vars.dict[findVar(scriptLine, cursors)].val);
-	}
-	return buff;
-}
-
 struct loopStack loadLoop(char *scriptLine, FILE *scriptFile);
 struct loopStack resetLoop(char *scriptLine, FILE *scriptFile){
 	// Setup loopStruct cursors 
@@ -445,16 +409,16 @@ struct loopStack resetLoop(char *scriptLine, FILE *scriptFile){
 		struct loopStruct *parent = &loops.stack[loops.ptr-1];
 		loop->buff = parent->buff;
 		if (loop->index == NO_INDEX) loop->start = parent->start;
-		else if ( (loop->start = skipFields(loop->buff, &fields.dict[loop->addr], loop->index, parent->start, parent->stop)) == NOT_FOUND){
-			fprintf(stderr, "ERROR: field segment '%s[%i]' is out of range.\n", fields.dict[loop->addr].key, loop->index);
+		else if ( (loop->start = skipFields(loop->buff, &fieldSegs.dict[loop->addr], loop->index, parent->start, parent->stop)) == NOT_FOUND){
+			fprintf(stderr, "ERROR: field segment '%s[%i]' is out of range.\n", fieldSegs.dict[loop->addr].key, loop->index);
 			exit(1);
 		}	
-		if ( (loop->stop = getNextField(loop->buff, fields.dict[loop->addr].val, loop->start, parent->stop)) == NOT_FOUND)
+		if ( (loop->stop = getNextField(loop->buff, fieldSegs.dict[loop->addr].val, loop->start, parent->stop)) == NOT_FOUND)
 			loop->stop = parent->stop;
 	}
 	else {	
 		// Load FILE_SEG
-		loop->buff = loadFile(NULL, files.dict[loop->addr], &loop->stop, loop->index);
+		loop->buff = loadFile(NULL, fileSegs.dict[loop->addr], &loop->stop, loop->index);
 		if (loop->buff == NULL) return --loops.ptr == -1 ? loops : loadLoop(scriptLine, scriptFile);
 		else loop->start = 0;
 	}
@@ -479,14 +443,14 @@ struct loopStack loadLoop(char *scriptLine, FILE *scriptFile){
 	if (loop->isLoop == FALSE) 
 		return --loops.ptr == -1 || loops.stack[loops.ptr].chain == FALSE ? loops : loadLoop(scriptLine, scriptFile);
 	else if (loop->type == FIELD_SEG){
-		loop->start = (fields.dict[loop->addr].val == NULL ? skipWhitespace(loop->buff, loop->stop) : loop->stop + fields.dict[loop->addr].len);
+		loop->start = (fieldSegs.dict[loop->addr].val == NULL ? skipWhitespace(loop->buff, loop->stop) : loop->stop + fieldSegs.dict[loop->addr].len);
 					       // delim != whitespace		    && delim == char-by-char	 	 && reached final char
-		if (loop->start > parent->stop || fields.dict[loop->addr].val != NULL && fields.dict[loop->addr].val[0] == 0 && loop->start == parent->stop)
+		if (loop->start > parent->stop || fieldSegs.dict[loop->addr].val != NULL && fieldSegs.dict[loop->addr].val[0] == 0 && loop->start == parent->stop)
 			return --loops.ptr == -1 || loops.stack[loops.ptr].chain == FALSE ? loops : loadLoop(scriptLine, scriptFile);
-		else if ( (loop->stop = getNextField(loop->buff, fields.dict[loop->addr].val, loop->start, parent->stop)) == NOT_FOUND)
+		else if ( (loop->stop = getNextField(loop->buff, fieldSegs.dict[loop->addr].val, loop->start, parent->stop)) == NOT_FOUND)
 			loop->stop = parent->stop;
 	}
-	else if ( (loop->buff = loadFile(loop->buff, files.dict[loop->addr], &loop->stop, 0)) == NULL)
+	else if ( (loop->buff = loadFile(loop->buff, fileSegs.dict[loop->addr], &loop->stop, 0)) == NULL)
 		return --loops.ptr == -1 || loops.stack[loops.ptr].chain == FALSE ? loops : loadLoop(scriptLine, scriptFile);
 	
 	if (loop->chain == TRUE){
@@ -525,16 +489,16 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 		return FALSE;
 	case VARIABLE:
 		if (inTxt[inCurs[STOP]] == '['){ // Segment
-			int addr = findSep(inTxt, inCurs);
+			int addr = findFieldSeg(inTxt, inCurs);
 			if (addr != NOT_FOUND) { // Field seg
 				getNextToken(inTxt, inCurs);
 				struct loopStruct *loop = &loops.stack[loops.ptr];
-				outCurs[START] = skipFields(loop->buff, &fields.dict[addr], (int)token2Num(inTxt, inCurs), loop->start, loop->stop);
+				outCurs[START] = skipFields(loop->buff, &fieldSegs.dict[addr], (int)token2Num(inTxt, inCurs), loop->start, loop->stop);
 				if (outCurs[START] == NOT_FOUND){
-					fprintf(stderr, "ERROR: field segment '%s[%i]' is out of range.\n", fields.dict[addr].key, (int)token2Num(inTxt, inCurs));
+					fprintf(stderr, "ERROR: field segment '%s[%i]' is out of range.\n", fieldSegs.dict[addr].key, (int)token2Num(inTxt, inCurs));
 					exit(1);
 				}
-				outCurs[STOP] = getNextField(loop->buff, fields.dict[addr].val, outCurs[START], loop->stop);
+				outCurs[STOP] = getNextField(loop->buff, fieldSegs.dict[addr].val, outCurs[START], loop->stop);
 				if (outCurs[STOP] == NOT_FOUND) outCurs[STOP] = loop->stop;
 				*outTxt = loops.stack[loops.ptr].buff;
 				return FALSE;
@@ -542,7 +506,7 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 			else {			// File seg
 				getNextToken(inTxt, inCurs);
 				outCurs[START] = STRING;
-				*outTxt = loadFile(NULL, files.dict[findFile(inTxt, inCurs)], &addr, (int)token2Num(inTxt, inCurs));
+				*outTxt = loadFile(NULL, fileSegs.dict[findFileSeg(inTxt, inCurs)], &addr, (int)token2Num(inTxt, inCurs));
 				return TRUE;
 			}
 		}
@@ -554,6 +518,42 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 	default:
 		return TERMINATOR;
 	}
+}
+
+char *varStrAss(char *scriptLine, int *cursors){
+	// Assign multiple concatenated strings to a variable
+	char *buff = NULL;
+	for (int status=getNextToken(scriptLine, cursors); status != TERMINATOR && status != COMMA; status = scriptLine[cursors[STOP]] == ',' ? COMMA : getNextToken(scriptLine, cursors)){
+		if (status == QUOTE || status == NUMBER) buff = substringJoin(buff, scriptLine, cursors[START], cursors[STOP]);
+		else if (status == ASTERISK) {
+			struct loopStruct *loop = &loops.stack[loops.ptr];
+			buff = (loop->type == FIELD_SEG ? substringJoin(buff, loop->buff, loop->start, loop->stop) : stringJoin(buff, loop->buff));
+		}
+		else if (scriptLine[cursors[STOP]] == '['){
+			int addr = findFieldSeg(scriptLine, cursors);
+			if (addr != NOT_FOUND ) {
+				getNextToken(scriptLine, cursors);
+				struct loopStruct *loop = &loops.stack[loops.ptr];
+				int start = skipFields(loop->buff, &fieldSegs.dict[addr], (int)token2Num(scriptLine, cursors) , loop->start, loop->stop);
+				if (start == NOT_FOUND){
+					fprintf(stderr, "ERROR: field segment '%s[%i]' is out of range.\n", fieldSegs.dict[addr].key, (int)token2Num(scriptLine, cursors));
+					exit(1);
+				}
+				int stop = getNextField(loop->buff, fieldSegs.dict[addr].val, start, loop->stop);
+				if (stop == NOT_FOUND) stop = loop->stop;
+				buff = substringJoin(buff, loop->buff, start, stop);
+			}
+			else {
+				addr = findFileSeg(scriptLine, cursors);
+				getNextToken(scriptLine, cursors);
+				char *string = loadFile(NULL, fileSegs.dict[addr], &addr, (int)token2Num(scriptLine, cursors));
+				buff = stringJoin(buff, string);
+				free(string);
+			}
+		}
+		else buff = stringJoin(buff, vars.dict[findVar(scriptLine, cursors)].val);
+	}
+	return buff;
 }
 
 int substringIsNum(char *txt, int from, int to){
@@ -666,8 +666,8 @@ int nextIf(char *scriptLine, FILE *scriptFile, int *cursors){
 
 int main(int argc, char **argv){
 	vars.count = 0, vars.dict = NULL;
-	fields.count = 0, fields.dict = NULL;
-	files.count = 0, files.dict = NULL;
+	fieldSegs.count = 0, fieldSegs.dict = NULL;
+	fileSegs.count = 0, fileSegs.dict = NULL;
 	loops.ptr = -1, loops.cap = 0, loops.stack = NULL;
 	clock_t clockStart;
 	char scriptLine[READ_SIZE + 1];
@@ -679,12 +679,12 @@ int main(int argc, char **argv){
 			do {
 				getNextToken(scriptLine, cursors);
 				int addr;
-				if ((addr = findSep(scriptLine, cursors)) != NOT_FOUND){
-					fprintf(stderr, "ERROR: '%s' already defined as field segment.\n", fields.dict[addr].key);
+				if ((addr = findFieldSeg(scriptLine, cursors)) != NOT_FOUND){
+					fprintf(stderr, "ERROR: '%s' already defined as field segment.\n", fieldSegs.dict[addr].key);
 					exit(1);
 				}
-				else if ((addr = findFile(scriptLine, cursors)) != NOT_FOUND){
-					fprintf(stderr, "ERROR: '%s' already defined as file segment.\n", files.dict[addr].key);
+				else if ((addr = findFileSeg(scriptLine, cursors)) != NOT_FOUND){
+					fprintf(stderr, "ERROR: '%s' already defined as file segment.\n", fileSegs.dict[addr].key);
 					exit(1);
 				}
 				else if ((addr = findVar(scriptLine, cursors)) == NOT_FOUND){
@@ -725,23 +725,23 @@ int main(int argc, char **argv){
 				fprintf(stderr, "ERROR: '%s' already defined as variable.\n", vars.dict[addr].key);
 				exit(1);
 			}
-			else if ((addr = findSep(scriptLine, cursors)) != NOT_FOUND){
-				fprintf(stderr, "ERROR: '%s' already defined as field segment.\n", fields.dict[addr].key);
+			else if ((addr = findFieldSeg(scriptLine, cursors)) != NOT_FOUND){
+				fprintf(stderr, "ERROR: '%s' already defined as field segment.\n", fieldSegs.dict[addr].key);
 				exit(1);
 			}
-			else if ((addr = findFile(scriptLine, cursors)) == NOT_FOUND){
+			else if ((addr = findFileSeg(scriptLine, cursors)) == NOT_FOUND){
 				// Allocate new file segment
-				addr = files.count++;
-				files.dict = realloc(files.dict, files.count * sizeof(struct fileDict));
-				files.dict[addr].key = substringSave(NULL, scriptLine, cursors);
+				addr = fileSegs.count++;
+				fileSegs.dict = realloc(fileSegs.dict, fileSegs.count * sizeof(struct fileDict));
+				fileSegs.dict[addr].key = substringSave(NULL, scriptLine, cursors);
 			}
 			else {
 				// Clear/Close this file segment
-				free(files.dict[addr].delimiter);
-				fclose(files.dict[addr].fp);
+				free(fileSegs.dict[addr].delimiter);
+				fclose(fileSegs.dict[addr].fp);
 			}
 
-			struct fileDict *file = &files.dict[addr];
+			struct fileDict *file = &fileSegs.dict[addr];
 
 			// Get filename
 			if (getNextToken(scriptLine, cursors) == QUOTE) {
@@ -778,18 +778,18 @@ int main(int argc, char **argv){
 				fprintf(stderr, "ERROR: '%s' already defined as variable.\n", vars.dict[addr].key);
 				exit(1);
 			}
-			else if ((addr = findFile(scriptLine, cursors)) != NOT_FOUND){
-				fprintf(stderr, "ERROR: '%s' already defined as file segment.\n", files.dict[addr].key);
+			else if ((addr = findFileSeg(scriptLine, cursors)) != NOT_FOUND){
+				fprintf(stderr, "ERROR: '%s' already defined as file segment.\n", fileSegs.dict[addr].key);
 				exit(1);
 			}
-			else if ((addr=findSep(scriptLine, cursors)) == NOT_FOUND){
-				addr = fields.count++;
-				fields.dict = realloc(fields.dict, fields.count * sizeof(struct fieldDict));
-				fields.dict[addr].key = substringSave(NULL, scriptLine, cursors);
+			else if ((addr=findFieldSeg(scriptLine, cursors)) == NOT_FOUND){
+				addr = fieldSegs.count++;
+				fieldSegs.dict = realloc(fieldSegs.dict, fieldSegs.count * sizeof(struct fieldDict));
+				fieldSegs.dict[addr].key = substringSave(NULL, scriptLine, cursors);
 			}
-			else free(fields.dict[addr].val);
+			else free(fieldSegs.dict[addr].val);
 
-			struct fieldDict *field = &fields.dict[addr];
+			struct fieldDict *field = &fieldSegs.dict[addr];
 
 			// Get delimiter
 			if (getNextToken(scriptLine, cursors) == QUOTE) {
@@ -819,8 +819,8 @@ int main(int argc, char **argv){
 
 				// Get type and addr
 				getNextToken(scriptLine, cursors);
-				loop->addr = findFile(scriptLine, cursors);
-				if ( loop->type = (loop->addr == NOT_FOUND) ) loop->addr = findSep(scriptLine, cursors);
+				loop->addr = findFileSeg(scriptLine, cursors);
+				if ( loop->type = (loop->addr == NOT_FOUND) ) loop->addr = findFieldSeg(scriptLine, cursors);
 
 				// Get index
 				if (scriptLine[cursors[STOP]] == '['){
