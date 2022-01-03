@@ -413,7 +413,10 @@ char *varStrAss(char *scriptLine, int *cursors){
 				getNextToken(scriptLine, cursors);
 				struct loopStruct *loop = &loops.stack[loops.ptr];
 				int start = skipFields(loop->buff, &fields.dict[addr], (int)token2Num(scriptLine, cursors) , loop->start, loop->stop);
-				// if start == NOT FOUND, you should raise an out of range error
+				if (start == NOT_FOUND){
+					fprintf(stderr, "ERROR: field segment '%s[%i]' is out of range.\n", fields.dict[addr].key, (int)token2Num(scriptLine, cursors));
+					exit(1);
+				}
 				int stop = getNextField(loop->buff, fields.dict[addr].val, start, loop->stop);
 				if (stop == NOT_FOUND) stop = loop->stop;
 				buff = substringJoin(buff, loop->buff, start, stop);
@@ -442,9 +445,10 @@ struct loopStack resetLoop(char *scriptLine, FILE *scriptFile){
 		struct loopStruct *parent = &loops.stack[loops.ptr-1];
 		loop->buff = parent->buff;
 		if (loop->index == NO_INDEX) loop->start = parent->start;
-		else if ( (loop->start = skipFields(loop->buff, &fields.dict[loop->addr], loop->index, parent->start, parent->stop)) == NOT_FOUND)
-			return --loops.ptr == -1 ? loops : loadLoop(scriptLine, scriptFile);
-		
+		else if ( (loop->start = skipFields(loop->buff, &fields.dict[loop->addr], loop->index, parent->start, parent->stop)) == NOT_FOUND){
+			fprintf(stderr, "ERROR: field segment '%s[%i]' is out of range.\n", fields.dict[loop->addr].key, loop->index);
+			exit(1);
+		}	
 		if ( (loop->stop = getNextField(loop->buff, fields.dict[loop->addr].val, loop->start, parent->stop)) == NOT_FOUND)
 			loop->stop = parent->stop;
 	}
@@ -526,7 +530,10 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 				getNextToken(inTxt, inCurs);
 				struct loopStruct *loop = &loops.stack[loops.ptr];
 				outCurs[START] = skipFields(loop->buff, &fields.dict[addr], (int)token2Num(inTxt, inCurs), loop->start, loop->stop);
-				// Raise out of range error if doesn't exist
+				if (outCurs[START] == NOT_FOUND){
+					fprintf(stderr, "ERROR: field segment '%s[%i]' is out of range.\n", fields.dict[addr].key, (int)token2Num(inTxt, inCurs));
+					exit(1);
+				}
 				outCurs[STOP] = getNextField(loop->buff, fields.dict[addr].val, outCurs[START], loop->stop);
 				if (outCurs[STOP] == NOT_FOUND) outCurs[STOP] = loop->stop;
 				*outTxt = loops.stack[loops.ptr].buff;
