@@ -7,7 +7,7 @@ enum position	{START, STOP};
 enum segment 	{FILE_SEG = 0, FIELD_SEG = 1};
 enum comparator {LE = 0, LT = 1, GE = 2, GT = 3, EQ = 4, NE = 5};
 enum tokenType 	{TERMINATOR = 6, QUOTE = 7, VARIABLE = 8, COMMA = 9, ASSIGNMENT = 10, ASTERISK = 11, MATHS = 11, NUMBER = 12}; 
-enum null 	{NOT_FOUND = -1, NO_INDEX = -1, STRING = -1};
+enum null 	{NOT_FOUND = -1, NO_INDEX = -1, NO_LOOP = -1, STRING = -1};
 enum boolean	{FALSE, TRUE};
 
 struct fileDict {
@@ -310,8 +310,8 @@ char *loadFile(char *buff, struct fileDict file, int *length, int index){
 	// Skip "index" number of "file" records and load next into "buff"
 	// Saves buff length into *length
 
-	int buffCap, cursor, found, in;
-	for (buffCap=0, index+=1; index; buffCap=0, --index){
+	int buffCap=0, cursor, found, in;
+	for (int ind = index+1; ind; buffCap=0, --ind){
 		do {
 			cursor = buffCap;
 			buffCap += READ_SIZE;
@@ -321,6 +321,10 @@ char *loadFile(char *buff, struct fileDict file, int *length, int index){
 		} while (found == NOT_FOUND  &&  in == READ_SIZE);
 
 		if (found != NOT_FOUND) fseek(file.fp, (long)(0 - (feof(file.fp) ? in : buffCap) + found + file.len), SEEK_CUR);
+		if (feof(file.fp) && ind > 1) {
+			fprintf(stderr, "ERROR: file segment '%s[%i]' is out of range.\n", file.key, index);
+			exit(1); 
+		}
 	}
 
 	*length = (found == NOT_FOUND ? cursor + in : found);
@@ -470,10 +474,18 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 	// If memory allocated for string, returns TRUE.  Else returns FALSE.
 	// If no token, returns TERMINATOR (-1)
 
+	int addr;
 	switch (getNextToken(inTxt, inCurs)){
 	case ASTERISK:
 		// User provided asterisk (*), which means "entire buffer"
-		// Error check that they didn't actually provide a different incorrect mathematical operator
+		if (inTxt[inCurs[START]] != '*'){
+			fprintf(stderr, "ERROR: expected asterisk '*'.  Found '%c'.\n", inTxt[inCurs[START]]);
+			exit(1);
+		}
+		else if (loops.ptr == NO_LOOP){
+			fprintf(stderr, "ERROR: No buffer set.  Asterisk '*' is only relevant within an 'in' block.\n");
+			exit(1);
+		}
 		*outTxt = loops.stack[loops.ptr].buff;
 		if (loops.stack[loops.ptr].type == FIELD_SEG){
 			outCurs[START] = loops.stack[loops.ptr].start;
@@ -488,9 +500,12 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 		*outTxt = inTxt;
 		return FALSE;
 	case VARIABLE:
-		if (inTxt[inCurs[STOP]] == '['){ // Segment
-			int addr = findFieldSeg(inTxt, inCurs);
-			if (addr != NOT_FOUND) { // Field seg
+		if (inTxt[inCurs[STOP]] == '['){ 							// Segment
+			if ((addr = findFieldSeg(inTxt, inCurs)) != NOT_FOUND) { 			// Field segment
+				if (loops.ptr == NO_LOOP){
+					fprintf(stderr, "ERROR: field segment '%s' cannot be used without first reading into a file segment.\n", fieldSegs.dict[addr].key);
+					exit(1);
+				}
 				getNextToken(inTxt, inCurs);
 				struct loopStruct *loop = &loops.stack[loops.ptr];
 				outCurs[START] = skipFields(loop->buff, &fieldSegs.dict[addr], (int)token2Num(inTxt, inCurs), loop->start, loop->stop);
@@ -503,17 +518,39 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 				*outTxt = loops.stack[loops.ptr].buff;
 				return FALSE;
 			}
-			else {			// File seg
+			else if ((addr = findFileSeg(inTxt, inCurs)) != NOT_FOUND){			// File segment
 				getNextToken(inTxt, inCurs);
 				outCurs[START] = STRING;
-				*outTxt = loadFile(NULL, fileSegs.dict[findFileSeg(inTxt, inCurs)], &addr, (int)token2Num(inTxt, inCurs));
+				*outTxt = loadFile(NULL, fileSegs.dict[addr], &addr, (int)token2Num(inTxt, inCurs));
 				return TRUE;
 			}
+			else if ((addr = findVar(inTxt, inCurs)) != NOT_FOUND){				// Var error
+				fprintf(stderr, "ERROR: variable '%s' cannot be indexed.\n", vars.dict[addr].key);
+				exit(1);
+			}
+			else {										// Unknown error
+				inTxt[inCurs[STOP]] = 0;
+				fprintf(stderr, "ERROR: '%s' does not exist.\n", &inTxt[inCurs[START]]);
+				exit(1);
+			}
 		}
-		else {				// Variable
+		else if ((addr = findVar(inTxt, inCurs)) != NOT_FOUND){					// Variable
 			outCurs[START] = STRING;
-			*outTxt = vars.dict[findVar(inTxt,inCurs)].val;
+			*outTxt = vars.dict[addr].val;
 			return FALSE;
+		}
+		else if ((addr=findFieldSeg(inTxt, inCurs)) != NOT_FOUND ) {
+			fprintf(stderr, "ERROR: Field segment '%s' requires an index in this context.\n", fieldSegs.dict[addr].key);
+			exit(1);
+		}
+		else if ((addr=findFileSeg(inTxt, inCurs)) != NOT_FOUND){
+			fprintf(stderr, "ERROR: File segment '%s' requires an index in this context.\n", fileSegs.dict[addr].key);
+			exit(1);
+		}
+		else {											// Unknown error
+			inTxt[inCurs[STOP]] = 0;
+			fprintf(stderr, "ERROR: '%s' does not exist.\n", &inTxt[inCurs[START]]);
+			exit(1);
 		}
 	default:
 		return TERMINATOR;
@@ -523,15 +560,22 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 char *varStrAss(char *scriptLine, int *cursors){
 	// Assign multiple concatenated strings to a variable
 	char *buff = NULL;
-	for (int status=getNextToken(scriptLine, cursors); status != TERMINATOR && status != COMMA; status = scriptLine[cursors[STOP]] == ',' ? COMMA : getNextToken(scriptLine, cursors)){
+	for (int status=getNextToken(scriptLine, cursors), addr; status != TERMINATOR && status != COMMA; status = scriptLine[cursors[STOP]] == ',' ? COMMA : getNextToken(scriptLine, cursors)){
 		if (status == QUOTE || status == NUMBER) buff = substringJoin(buff, scriptLine, cursors[START], cursors[STOP]);
 		else if (status == ASTERISK) {
+			if (scriptLine[cursors[START]] != '*'){
+				fprintf(stderr, "ERROR: expected asterisk '*'.  Found '%c'.\n", scriptLine[cursors[START]]);
+				exit(1);
+			}
+			else if (loops.ptr == NO_LOOP){
+				fprintf(stderr, "ERROR: No buffer set.  Asterisk '*' is only relevant within an 'in' block.\n");
+				exit(1);
+			}
 			struct loopStruct *loop = &loops.stack[loops.ptr];
 			buff = (loop->type == FIELD_SEG ? substringJoin(buff, loop->buff, loop->start, loop->stop) : stringJoin(buff, loop->buff));
 		}
 		else if (scriptLine[cursors[STOP]] == '['){
-			int addr = findFieldSeg(scriptLine, cursors);
-			if (addr != NOT_FOUND ) {
+			if ((addr=findFieldSeg(scriptLine, cursors)) != NOT_FOUND ) {
 				getNextToken(scriptLine, cursors);
 				struct loopStruct *loop = &loops.stack[loops.ptr];
 				int start = skipFields(loop->buff, &fieldSegs.dict[addr], (int)token2Num(scriptLine, cursors) , loop->start, loop->stop);
@@ -543,15 +587,39 @@ char *varStrAss(char *scriptLine, int *cursors){
 				if (stop == NOT_FOUND) stop = loop->stop;
 				buff = substringJoin(buff, loop->buff, start, stop);
 			}
-			else {
+			else if ((addr=findFileSeg(scriptLine, cursors)) != NOT_FOUND){
 				addr = findFileSeg(scriptLine, cursors);
 				getNextToken(scriptLine, cursors);
 				char *string = loadFile(NULL, fileSegs.dict[addr], &addr, (int)token2Num(scriptLine, cursors));
 				buff = stringJoin(buff, string);
 				free(string);
 			}
+			else if ((addr = findVar(scriptLine, cursors)) != NOT_FOUND){		
+				fprintf(stderr, "ERROR: variable '%s' cannot be indexed.\n", vars.dict[addr].key);
+				exit(1);
+			}
+			else {						
+				scriptLine[cursors[STOP]] = 0;
+				fprintf(stderr, "ERROR: '%s' does not exist.\n", &scriptLine[cursors[START]]);
+				exit(1);
+			}
 		}
-		else buff = stringJoin(buff, vars.dict[findVar(scriptLine, cursors)].val);
+		else if ((addr=findVar(scriptLine, cursors)) != NOT_FOUND){
+			buff = stringJoin(buff, vars.dict[findVar(scriptLine, cursors)].val);
+		}
+		else if ((addr=findFieldSeg(scriptLine, cursors)) != NOT_FOUND ) {
+			fprintf(stderr, "ERROR: Field segment '%s' requires an index in this context.\n", fieldSegs.dict[addr].key);
+			exit(1);
+		}
+		else if ((addr=findFileSeg(scriptLine, cursors)) != NOT_FOUND){
+			fprintf(stderr, "ERROR: File segment '%s' requires an index in this context.\n", fileSegs.dict[addr].key);
+			exit(1);
+		}
+		else {	
+			scriptLine[cursors[STOP]] = 0;
+			fprintf(stderr, "ERROR: '%s' does not exist.\n", &scriptLine[cursors[START]]);
+			exit(1);
+		}
 	}
 	return buff;
 }
@@ -872,8 +940,21 @@ int main(int argc, char **argv){
 				else if (substringEquals("out", scriptLine, cursors)) --loopCount;
 			}
 		}
-		else {
+		else if (substringEquals("fi", scriptLine, cursors) == FALSE){
 			int destAddr = findVar(scriptLine, cursors);
+			if (destAddr == NOT_FOUND){
+				int err;
+				if ((err=findFieldSeg(scriptLine, cursors)) != NOT_FOUND)
+					fprintf(stderr, "ERROR: Field segment '%s' cannot be assigned to.\n", fieldSegs.dict[err].key);
+				else if ((err=findFieldSeg(scriptLine, cursors)) != NOT_FOUND)
+					fprintf(stderr, "ERROR: File segment '%s' cannot be assigned to.\n", fileSegs.dict[err].key);
+				else {
+					scriptLine[cursors[STOP]] = 0;
+					fprintf(stderr, "ERROR: Variable '%s' does not exist.\n", vars.dict[destAddr].key);
+				}
+				exit(1);
+			}
+
 			if (scriptLine[cursors[STOP]] == '=' || getNextToken(scriptLine, cursors) == ASSIGNMENT){
 				char *newVar = varStrAss(scriptLine, cursors);
 				free(vars.dict[destAddr].val);
