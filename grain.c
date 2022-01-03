@@ -940,6 +940,10 @@ int main(int argc, char **argv){
 				else if (substringEquals("out", scriptLine, cursors)) --loopCount;
 			}
 		}
+		else if (substringEquals("exit", scriptLine, cursors)){
+			// You should really close files and free memory before exiting
+			exit(0);
+		}
 		else if (substringEquals("fi", scriptLine, cursors) == FALSE){
 			int destAddr = findVar(scriptLine, cursors);
 			if (destAddr == NOT_FOUND){
@@ -991,5 +995,6 @@ int main(int argc, char **argv){
 			}
 		}
 	}
+	// You should really close files and free memory before exiting
 	return 0;
 }
