@@ -624,6 +624,36 @@ char *varStrAss(char *scriptLine, int *cursors){
 	return buff;
 }
 
+char *varMthAss(int varAddr, char *scriptLine, int *cursors){
+	float augend = string2Num(vars.dict[varAddr].val), addend;
+	do {
+		char op = scriptLine[cursors[START]];
+		char *subTxt;
+		int augCurs[2];
+		int toFree = retrieveToken(augCurs, &subTxt, scriptLine, cursors);
+		addend = augCurs[START] == STRING ? string2Num(subTxt) : substring2Num(subTxt, augCurs);
+		if (toFree == TRUE) free(subTxt);
+		switch(op){
+		case '+':
+			augend += addend;
+			break;
+		case '-':
+			augend -= addend;
+			break;
+		case '*':
+			augend *= addend;
+			break;
+		case '/':
+			augend /= addend;
+			break;
+		case '%':
+			augend = (int)augend % (int)addend;
+			break;
+		}
+	} while (getNextToken(scriptLine, cursors) != TERMINATOR);
+	return num2String(vars.dict[varAddr].val, augend);
+}
+
 int substringIsNum(char *txt, int from, int to){
 	for (  ; from < to; ++from) if (txt[from] < 48 && txt[from] != 46 || txt[from] > 57) return FALSE;
 	return TRUE;
@@ -732,6 +762,16 @@ int nextIf(char *scriptLine, FILE *scriptFile, int *cursors){
 	}
 }
 
+void endLoop(char *scriptLine, FILE *scriptFile){
+	for (int loopCount=1; loopCount; ){
+		fgets(scriptLine, READ_SIZE + 1, scriptFile);
+		int cursors[2] = {-1, -1};
+		getNextToken(scriptLine, cursors);
+		if (substringEquals("in", scriptLine, cursors)) ++loopCount;
+		else if (substringEquals("out", scriptLine, cursors)) --loopCount;
+	}
+}
+
 int main(int argc, char **argv){
 	vars.count = 0, vars.dict = NULL;
 	fieldSegs.count = 0, fieldSegs.dict = NULL;
@@ -762,16 +802,44 @@ int main(int argc, char **argv){
 					vars.dict[addr].val = NULL;
 					vars.dict[addr].key = substringSave(NULL, scriptLine, cursors);
 				}
-
-				if (scriptLine[cursors[STOP]] == '=' || 
-				    scriptLine[cursors[STOP]] != ',' && getNextToken(scriptLine, cursors) == ASSIGNMENT){
-					// User is initialising variable, as well as declaring.
+			
+				switch(scriptLine[cursors[STOP]]){
+				case '=':
+					// String assignment without whitespace
 					vars.dict[addr].val = varStrAss(scriptLine, cursors);
-				}
-				else if (vars.dict[addr].val == NULL || vars.dict[addr].val[0] != 0){
-					// Initialise empty variable
-					vars.dict[addr].val = realloc(vars.dict[addr].val, sizeof(char));
-					vars.dict[addr].val[0] = 0;
+					break;
+				case '+':
+				case '-':
+				case '/':
+				case '*':
+				case '%':
+					// Maths assignment without whitespace
+					vars.dict[addr].val = realloc(vars.dict[addr].val, 2 * sizeof(char));
+					vars.dict[addr].val[0] = '0';
+					vars.dict[addr].val[1] = '\0';
+					vars.dict[addr].val = varMthAss(addr, scriptLine, cursors);
+					break;
+				default:
+					switch(getNextToken(scriptLine,cursors)){
+					case ASSIGNMENT:
+						// String assignment with whitespace
+						vars.dict[addr].val = varStrAss(scriptLine, cursors);
+						break;
+					case MATHS:
+						// Maths assignment with whitespace
+						vars.dict[addr].val = realloc(vars.dict[addr].val, 2 * sizeof(char));
+						vars.dict[addr].val[0] = '0';
+						vars.dict[addr].val[1] = '\0';
+						vars.dict[addr].val = varMthAss(addr, scriptLine, cursors);
+						break;
+					default:
+						if (vars.dict[addr].val == NULL || vars.dict[addr].val[0] != 0){
+							// No assignment: initialise empty variable
+							vars.dict[addr].val = realloc(vars.dict[addr].val, sizeof(char));
+							vars.dict[addr].val[0] = 0;
+						}
+						break;
+					}
 				}
 			} while (scriptLine[cursors[START]] == ',' || scriptLine[cursors[STOP]] == ','); // Multiple comma-separated var declarations
 		}
@@ -906,18 +974,14 @@ int main(int argc, char **argv){
 
 			} while ( loops.ptr != -1 && (loops.stack[loops.ptr].chain = (scriptLine[cursors[STOP]] == '.')) );
 
-			if (loops.ptr == -1){
-				for (int loopCount=1; loopCount; ){
-					fgets(scriptLine, READ_SIZE + 1, scriptFile);
-					cursors[STOP] = -1;
-					getNextToken(scriptLine, cursors);
-					if (substringEquals("in", scriptLine, cursors)) ++loopCount;
-					else if (substringEquals("out", scriptLine, cursors)) --loopCount;
-				}
-			}
+			if (loops.ptr == NO_LOOP) endLoop(scriptLine, scriptFile);
 		}
 		else if (substringEquals("out", scriptLine, cursors) || substringEquals("cont", scriptLine, cursors)){
 			loops = loadLoop(scriptLine, scriptFile);
+		}
+		else if (substringEquals("cont", scriptLine, cursors)){
+			loops = loadLoop(scriptLine, scriptFile);
+			if (loops.ptr == NO_LOOP) endLoop(scriptLine, scriptFile);
 		}
 		else if (substringEquals("if", scriptLine, cursors)){
 			while (comparator(scriptLine, cursors) == FALSE   &&   nextIf(scriptLine, scriptFile, cursors) == FALSE);
@@ -932,13 +996,7 @@ int main(int argc, char **argv){
 				if (loops.stack[loops.ptr].type == FILE_SEG) free(loops.stack[loops.ptr].buff);
 			} while ( --loops.ptr >= 0 && loops.stack[loops.ptr].chain == TRUE);
 
-			for (int loopCount=1; loopCount; ){
-				fgets(scriptLine, READ_SIZE + 1, scriptFile);
-				cursors[STOP] = -1;
-				getNextToken(scriptLine, cursors);
-				if (substringEquals("in", scriptLine, cursors)) ++loopCount;
-				else if (substringEquals("out", scriptLine, cursors)) --loopCount;
-			}
+			endLoop(scriptLine, scriptFile);
 		}
 		else if (substringEquals("exit", scriptLine, cursors)){
 			// You should really close files and free memory before exiting
@@ -965,13 +1023,14 @@ int main(int argc, char **argv){
 				vars.dict[destAddr].val = newVar;
 			}
 			else {
-				float augend = string2Num(vars.dict[destAddr].val), addend;
+				vars.dict[destAddr].val = varMthAss(destAddr, scriptLine, cursors);
+				/*float augend = string2Num(vars.dict[destAddr].val), addend;
 				do {
 					char op = scriptLine[cursors[START]];
 					char *subTxt;
 					int augCurs[2];
 					int toFree = retrieveToken(augCurs, &subTxt, scriptLine, cursors);
-					addend = augCurs[START] == NOT_FOUND ? string2Num(subTxt) : substring2Num(subTxt, augCurs);
+					addend = augCurs[START] == STRING ? string2Num(subTxt) : substring2Num(subTxt, augCurs);
 					if (toFree == TRUE) free(subTxt);
 					switch(op){
 					case '+':
@@ -991,7 +1050,7 @@ int main(int argc, char **argv){
 						break;
 					}
 				} while (getNextToken(scriptLine, cursors) != TERMINATOR);
-				vars.dict[destAddr].val = num2String(vars.dict[destAddr].val, augend);
+				vars.dict[destAddr].val = num2String(vars.dict[destAddr].val, augend);*/
 			}
 		}
 	}
