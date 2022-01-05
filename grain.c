@@ -7,7 +7,7 @@ enum boolean	{FALSE, TRUE};
 enum segment 	{FILE_SEG = 0, FIELD_SEG = 1, VAR = 2};
 enum comparator {LE = 0, LT = 1, GE = 2, GT = 3, EQ = 4, NE = 5};
 enum null 	{NOT_FOUND = -1, NO_INDEX = -1, NO_LOOP = -1, STRING = -1};
-enum errors 	{OOR, NO_ASTERISK, NO_BUFFER, NO_FILE_SEG, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS};
+enum errors 	{OOR, NO_ASTERISK, NO_BUFFER, NO_FILE_SEG, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS, ESC_SEQ};
 enum tokenType 	{TERMINATOR = 6, QUOTE = 7, VARIABLE = 8, COMMA = 9, ASSIGNMENT = 10, ASTERISK = 11, MATHS = 11, NUMBER = 12}; 
 
 struct fileDict {
@@ -97,9 +97,13 @@ void throwError(int errNum, char *errStr, int errA, int errB){
 	case EXISTS:
 		fprintf(stderr, "ERROR: '%s' already exists as %s.\n", errStr, errA == FIELD_SEG ? "field segment" : (errA == FILE_SEG ? "file segment" : "variable"));
 		break;
+	case ESC_SEQ:
+		fprintf(stderr, "ERROR: '\\%c' escape sequence not recognised.  Valid escape sequences include \\n, \\t, \\\\, \\', \\` and \\\".\n", *errStr);
+		break;
 	}
 	exit(errNum);
 }
+
 int getNextToken(char *txt, int *cursors){
 	// Moves cursors[START] and cursors[STOP] around next token
 	// Returns int representing type of token found
@@ -189,6 +193,8 @@ int getNextToken(char *txt, int *cursors){
 				case '`':
 					txt[cursors[STOP]] = '`';
 					break;
+				default:
+					throwError(ESC_SEQ, &txt[cursors[STOP]], -1, -1);
 				}
 			}
 		}
@@ -210,11 +216,7 @@ int getNextToken(char *txt, int *cursors){
 					           && txt[cursors[STOP]] != 0 
 					           && txt[cursors[STOP]] != '=' 
 						   && txt[cursors[STOP]] != ';'
-						   && txt[cursors[STOP]] != ','
-						   && txt[cursors[STOP]] != '('
-						   && txt[cursors[STOP]] != ')'
-						   && txt[cursors[STOP]] != '['
-						   && txt[cursors[STOP]] != ']' ; ++cursors[STOP]);
+						   && txt[cursors[STOP]] != ',' ; ++cursors[STOP]);
 		return NUMBER;
 	default:
 		for (cursors[STOP] = cursors[START]+1; txt[cursors[STOP]] != ' ' 
@@ -481,14 +483,13 @@ struct loopStack resetLoop(char *scriptLine, FILE *scriptFile){
 		else loop->start = 0;
 	}
 
-	// Check from here
 	if (loop->chain == TRUE){
 		++loops.ptr;
 		return resetLoop(scriptLine, scriptFile);
 	}
+	else if (loop->cmd == -1) loop->cmd = ftell(scriptFile);
+	else fseek(scriptFile, loop->cmd, SEEK_SET);
 
-	fseek(scriptFile, loop->cmd, SEEK_SET);
-	// To here
 	return loops;
 }
 
@@ -577,50 +578,24 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 		else if ((addr=findFieldSeg(inTxt, inCurs)) != NOT_FOUND ) throwError(NO_INDEX, fieldSegs.dict[addr].key, FIELD_SEG, -1);
 		else if ((addr=findFileSeg(inTxt, inCurs)) != NOT_FOUND) throwError(NO_INDEX, fileSegs.dict[addr].key, FILE_SEG, -1);
 		else throwError(NOT_EXIST, inTxt, inCurs[START], inCurs[STOP]);								// Unknown error
-	default:
+	case COMMA:
+	case TERMINATOR:
 		return TERMINATOR;
+	default:
+		fprintf(stderr, "Unknown token\n");
+		exit(1);
 	}
 }
 
 char *varStrAss(char *scriptLine, int *cursors){
 	// Assign multiple concatenated strings to a variable
-	char *buff = NULL;
-	for (int status=getNextToken(scriptLine, cursors), addr; status != TERMINATOR && status != COMMA; status = scriptLine[cursors[STOP]] == ',' ? COMMA : getNextToken(scriptLine, cursors)){
-		if (status == QUOTE || status == NUMBER) buff = substringJoin(buff, scriptLine, cursors[START], cursors[STOP]);
-		else if (status == ASTERISK) {
-			if (scriptLine[cursors[START]] != '*') throwError(NO_ASTERISK, &scriptLine[cursors[START]], -1, -1);
-			else if (loops.ptr == NO_LOOP) throwError(NO_BUFFER, NULL, -1, -1);
-			struct loopStruct *loop = &loops.stack[loops.ptr];
-			buff = (loop->type == FIELD_SEG ? substringJoin(buff, loop->buff, loop->start, loop->stop) : stringJoin(buff, loop->buff));
-		}
-		else if (scriptLine[cursors[STOP]] == '['){
-			if ((addr=findFieldSeg(scriptLine, cursors)) != NOT_FOUND ) {
-				getNextToken(scriptLine, cursors);
-				struct loopStruct *loop = &loops.stack[loops.ptr];
-				int start = skipFields(loop->buff, &fieldSegs.dict[addr], (int)token2Num(scriptLine, cursors) , loop->start, loop->stop);
-				if (start == NOT_FOUND) throwError(OOR, fieldSegs.dict[addr].key, (int)token2Num(scriptLine, cursors), FIELD_SEG);
-				int stop = getNextField(loop->buff, fieldSegs.dict[addr].val, start, loop->stop);
-				if (stop == NOT_FOUND) stop = loop->stop;
-				buff = substringJoin(buff, loop->buff, start, stop);
-			}
-			else if ((addr=findFileSeg(scriptLine, cursors)) != NOT_FOUND){
-				addr = findFileSeg(scriptLine, cursors);
-				getNextToken(scriptLine, cursors);
-				char *string = loadFile(NULL, fileSegs.dict[addr], &addr, (int)token2Num(scriptLine, cursors));
-				buff = stringJoin(buff, string);
-				free(string);
-			}
-			else if ((addr = findVar(scriptLine, cursors)) != NOT_FOUND) throwError(INDEX_VAR, vars.dict[addr].key, -1, -1);
-			else throwError(NOT_EXIST, scriptLine, cursors[START], cursors[STOP]);
-		}
-		else if ((addr=findVar(scriptLine, cursors)) != NOT_FOUND){
-			buff = stringJoin(buff, vars.dict[findVar(scriptLine, cursors)].val);
-		}
-		else if ((addr=findFieldSeg(scriptLine, cursors)) != NOT_FOUND ) throwError(NO_INDEX, fieldSegs.dict[addr].key, FIELD_SEG, -1);
-		else if ((addr=findFileSeg(scriptLine, cursors)) != NOT_FOUND) throwError(NO_INDEX, fileSegs.dict[addr].key, FILE_SEG, -1);
-		else throwError(NOT_EXIST, scriptLine, cursors[START], cursors[STOP]);
+	char *out = NULL, *buff;
+	int freeBuff, buffCurs[2];
+	while (scriptLine[cursors[STOP]] != ',' && (freeBuff=retrieveToken(buffCurs, &buff, scriptLine, cursors)) != TERMINATOR){
+		out = buffCurs[START] == STRING ? stringJoin(out, buff) : substringJoin(out, buff, buffCurs[START], buffCurs[STOP]);
+		if (freeBuff) free(buff); 
 	}
-	return buff;
+	return out;
 }
 
 char *varMthAss(int varAddr, char *scriptLine, int *cursors){
@@ -655,6 +630,8 @@ char *varMthAss(int varAddr, char *scriptLine, int *cursors){
 
 int compareTokens(char *txtA, int *cursA, char *txtB, int *cursB){
 	// Return 0 if A == B ; > 0 if A > B ; < 0 if A < B
+
+	// Inefficient.  IsNum() functions are used, then used again in the 2Num() functions.
 	int aIsNum = cursA[START] == STRING ? stringIsNum(txtA) : substringIsNum(txtA, cursA[START], cursA[STOP]);
 	int bIsNum = cursB[START] == STRING ? stringIsNum(txtB) : substringIsNum(txtB, cursB[START], cursB[STOP]);
 	if (aIsNum && bIsNum){
@@ -766,7 +743,6 @@ int main(int argc, char **argv){
 	fieldSegs.count = 0, fieldSegs.dict = NULL;
 	fileSegs.count = 0, fileSegs.dict = NULL;
 	loops.ptr = -1, loops.cap = 0, loops.stack = NULL;
-	clock_t clockStart;
 	char scriptLine[READ_SIZE + 1];
 	FILE *scriptFile = fopen(argv[1], "r");
 	for ( fgets(scriptLine, READ_SIZE + 1, scriptFile) ; !feof(scriptFile); fgets(scriptLine, READ_SIZE + 1, scriptFile) ) {
@@ -922,7 +898,7 @@ int main(int argc, char **argv){
 				struct loopStruct *loop = &loops.stack[loops.ptr];
 
 				// Save cmd
-				loop->cmd = ftell(scriptFile);
+				loop->cmd = -1;
 
 				// Get type and addr
 				getNextToken(scriptLine, cursors);
@@ -971,8 +947,7 @@ int main(int argc, char **argv){
 			endLoop(scriptLine, scriptFile);
 		}
 		else if (substringEquals("exit", scriptLine, cursors)){
-			// You should really close files and free memory before exiting
-			exit(0);
+			break;
 		}
 		else if (substringEquals("fi", scriptLine, cursors) == FALSE){
 			int destAddr = findVar(scriptLine, cursors);
@@ -993,6 +968,24 @@ int main(int argc, char **argv){
 			}
 		}
 	}
-	// You should really close files and free memory before exiting
+	// CLEAN UP
+	fclose(scriptFile);
+
+	// Free loop buffers
+	for ( ; loops.ptr > -1; --loops.ptr) if (loops.stack[loops.ptr].type == FILE_SEG) free(loops.stack[loops.ptr].buff);
+	if (loops.stack != NULL) free(loops.stack);
+
+	// Free variables
+	for (int var=0; var < vars.count; ++var) free(vars.dict[var].key), free(vars.dict[var].val);
+	if (vars.dict != NULL) free(vars.dict);
+
+	// Free file segments
+	for (int file=0; file < fileSegs.count; ++file) free(fileSegs.dict[file].key), free(fileSegs.dict[file].delimiter), fclose(fileSegs.dict[file].fp);
+	if (fileSegs.dict != NULL) free(fileSegs.dict);
+
+	// Free field segments
+	for (int field=0; field < fieldSegs.count; ++field) free(fieldSegs.dict[field].key), free(fieldSegs.dict[field].val);
+	if (fieldSegs.dict != NULL) free(fieldSegs.dict);
+
 	return 0;
 }
