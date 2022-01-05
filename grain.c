@@ -7,7 +7,7 @@ enum boolean	{FALSE, TRUE};
 enum segment 	{FILE_SEG = 0, FIELD_SEG = 1, VAR = 2};
 enum comparator {LE = 0, LT = 1, GE = 2, GT = 3, EQ = 4, NE = 5};
 enum null 	{NOT_FOUND = -1, NO_INDEX = -1, NO_LOOP = -1, STRING = -1};
-enum errors 	{OOR, NO_ASTERISK, NO_BUFFER, NO_FILE_SEG, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS, ESC_SEQ};
+enum errors 	{OOR, NO_ASTERISK, NO_BUFFER, NO_FILE_SEG, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS, ESC_SEQ, NO_EQUALS};
 enum tokenType 	{TERMINATOR = 6, QUOTE = 7, VARIABLE = 8, COMMA = 9, ASSIGNMENT = 10, ASTERISK = 11, MATHS = 11, NUMBER = 12}; 
 
 struct fileDict {
@@ -99,6 +99,9 @@ void throwError(int errNum, char *errStr, int errA, int errB){
 		break;
 	case ESC_SEQ:
 		fprintf(stderr, "ERROR: '\\%c' escape sequence not recognised.  Valid escape sequences include \\n, \\t, \\\\, \\', \\` and \\\".\n", *errStr);
+		break;
+	case NO_EQUALS:
+		fprintf(stderr, "ERROR: expected equals '=' assignment operator.  Found '%c'.\n", *errStr);
 		break;
 	}
 	exit(errNum);
@@ -306,18 +309,19 @@ int stringIsNum(char *txt){
 
 float substring2Num(char *txt, int *cursors){
 	// Converts txt[START-STOP] to float
-	if (!substringIsNum(txt, cursors[START], cursors[STOP])) throwError(NOT_NUM, txt, cursors[START], cursors[STOP]);
 	float result = 0;
 	int pos, isNeg=(txt[cursors[START]]=='-');
 	for (pos=cursors[START] + isNeg; pos < cursors[STOP] && txt[pos] != '.'; ++pos){
 		result *= 10;
-		result += (float)(txt[pos] - 48);
+		if (txt[pos] < 48 || txt[pos] > 57) throwError(NOT_NUM, txt, cursors[START], cursors[STOP]);
+		else result += (float)(txt[pos] - 48);
 	}
 
 	if (txt[pos] == '.'){
 		++pos;
 		for (int shift = 10; pos < cursors[STOP]; shift *= 10, ++pos){
-			result += (float)(txt[pos]-48) / (float)shift;
+			if (txt[pos] < 48 || txt[pos] > 57) throwError(NOT_NUM, txt, cursors[START], cursors[STOP]);
+			else result += (float)(txt[pos]-48) / (float)shift;
 		}
 	}
 	return isNeg ? 0 - result : result;
@@ -325,18 +329,20 @@ float substring2Num(char *txt, int *cursors){
 
 float string2Num(char *txt){
 	// Converts txt to float
-	if (!stringIsNum(txt)) throwError(NOT_NUM, txt, -1, -1);
 	float result=0;
 	int pos, isNeg=(txt[0]=='-');
 	for (pos=isNeg; txt[pos] != 0 && txt[pos] != '.'; ++pos){
 		result *= 10;
-		result += (float)(txt[pos] - 48);
+		if (txt[pos] < 48 || txt[pos] > 57) throwError(NOT_NUM, txt, -1, -1);
+		else result += (float)(txt[pos] - 48);
 	}
 
 	if (txt[pos] == '.'){
 		++pos;
 		for (int shift = 10; txt[pos] != 0; shift *= 10, ++pos){
-			result += (float)(txt[pos]-48) / (float)shift;
+			if (txt[pos] < 48 || txt[pos] > 57) throwError(NOT_NUM, txt, -1, -1);
+			else result += (float)(txt[pos]-48) / (float)shift;
+			//result += (float)(txt[pos]-48) / (float)shift;
 		}
 	}
 
@@ -773,6 +779,7 @@ int main(int argc, char **argv){
 				case '*':
 				case '%':
 					// Maths assignment without whitespace
+					if (scriptLine[cursors[STOP]+1] != '=') throwError(NO_EQUALS, &scriptLine[cursors[STOP]+1], -1, -1);
 					vars.dict[addr].val = realloc(vars.dict[addr].val, 2 * sizeof(char));
 					vars.dict[addr].val[0] = '0';
 					vars.dict[addr].val[1] = '\0';
@@ -786,6 +793,7 @@ int main(int argc, char **argv){
 						break;
 					case MATHS:
 						// Maths assignment with whitespace
+						if (scriptLine[cursors[STOP]] != '=') throwError(NO_EQUALS, &scriptLine[cursors[STOP]], -1, -1);
 						vars.dict[addr].val = realloc(vars.dict[addr].val, 2 * sizeof(char));
 						vars.dict[addr].val[0] = '0';
 						vars.dict[addr].val[1] = '\0';
