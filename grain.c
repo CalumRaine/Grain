@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #define READ_SIZE 500
 enum position	{START, STOP};
@@ -62,43 +61,44 @@ struct loopStack {
 	struct loopStruct *stack;
 } loops;
 
-void throwError(int errorNumber, char *errorString, int errorInt, int errorLen){
-	switch(errorNumber){
+void throwError(int errNum, char *errStr, int errA, int errB){
+	// errA and errB are used to pass integers, they could be represent types or substring coordinates.  Set to -1 if unused.
+	switch(errNum){
 	case OOR:
-		fprintf(stderr, "ERROR: %s segment '%s[%i]' is out of range.\n", errorLen == FIELD_SEG ? "field" : "file", errorString, errorInt);
+		fprintf(stderr, "ERROR: %s segment '%s[%i]' is out of range.\n", errB == FIELD_SEG ? "field" : "file", errStr, errA);
 		break;
 	case NO_ASTERISK:
-		fprintf(stderr, "ERROR: exepcted asterisk '*'.  Found '%c'.\n", *errorString);
+		fprintf(stderr, "ERROR: exepcted asterisk '*'.  Found '%c'.\n", *errStr);
 		break;
 	case NO_BUFFER:
 		fprintf(stderr, "ERROR: no buffer set.  Asterisk '*' only relevant within an 'in' block.\n");
 		break;
 	case NO_FILE_SEG:
-		if (errorLen != -1) errorString[errorLen]=0;
-		fprintf(stderr, "ERROR: field segment '%s' cannot be used without first reading into a file segment.\n", errorLen != -1 ? &errorString[errorInt] : errorString);
+		if (errB != -1) errStr[errB]=0;
+		fprintf(stderr, "ERROR: field segment '%s' cannot be used without first reading into a file segment.\n", errB != -1 ? &errStr[errA] : errStr);
 		break;
 	case INDEX_VAR:
-		fprintf(stderr, "ERROR: variable '%s' cannot be indexed.\n", errorString);
+		fprintf(stderr, "ERROR: variable '%s' cannot be indexed.\n", errStr);
 		break;
 	case NOT_EXIST:
-		errorString[errorLen]=0;
-		fprintf(stderr, "ERROR: '%s' does not exist.\n", &errorString[errorInt]);
+		errStr[errB]=0;
+		fprintf(stderr, "ERROR: '%s' does not exist.\n", &errStr[errA]);
 		break;
 	case NO_INDEX:
-		fprintf(stderr, "ERROR: %s segment '%s' requires an index in this context.\n", errorLen == FIELD_SEG ? "field" : "file", errorString);
+		fprintf(stderr, "ERROR: %s segment '%s' requires an index in this context.\n", errB == FIELD_SEG ? "field" : "file", errStr);
 		break;
 	case NOT_NUM:
-		if (errorLen != -1) errorString[errorLen] = 0;
-		fprintf(stderr, "ERROR: '%s' is not a valid number.\n", errorLen != -1 ? &errorString[errorInt] : errorString);
+		if (errB != -1) errStr[errB] = 0;
+		fprintf(stderr, "ERROR: '%s' is not a valid number.\n", errB != -1 ? &errStr[errA] : errStr);
 		break;
 	case ASSIGN:
-		fprintf(stderr, "ERROR: %s segment '%s' cannot be assigned to.\n", errorInt == FIELD_SEG ? "field" : "file", errorString);
+		fprintf(stderr, "ERROR: %s segment '%s' cannot be assigned to.\n", errA == FIELD_SEG ? "field" : "file", errStr);
 		break;
 	case EXISTS:
-		fprintf(stderr, "ERROR: '%s' already exists as %s.\n", errorString, errorInt == FIELD_SEG ? "field segment" : (errorInt == FILE_SEG ? "file segment" : "variable"));
+		fprintf(stderr, "ERROR: '%s' already exists as %s.\n", errStr, errA == FIELD_SEG ? "field segment" : (errA == FILE_SEG ? "file segment" : "variable"));
 		break;
 	}
-	exit(errorNumber);
+	exit(errNum);
 }
 int getNextToken(char *txt, int *cursors){
 	// Moves cursors[START] and cursors[STOP] around next token
