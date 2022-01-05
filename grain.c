@@ -7,7 +7,7 @@ enum boolean	{FALSE, TRUE};
 enum segment 	{FILE_SEG = 0, FIELD_SEG = 1, VAR = 2};
 enum comparator {LE = 0, LT = 1, GE = 2, GT = 3, EQ = 4, NE = 5};
 enum null 	{NOT_FOUND = -1, NO_INDEX = -1, NO_LOOP = -1, STRING = -1};
-enum errors 	{OOR, NO_ASTERISK, NO_BUFFER, NO_FILE_SEG, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS, ESC_SEQ, NO_EQUALS};
+enum errors 	{OOR, NO_ASTERISK, NO_BUFFER, NO_FILE_SEG, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS, ESC_SEQ, NO_EQUALS, NO_FI, NO_OUT};
 enum tokenType 	{TERMINATOR = 6, QUOTE = 7, VARIABLE = 8, COMMA = 9, ASSIGNMENT = 10, ASTERISK = 11, MATHS = 11, NUMBER = 12}; 
 
 struct fileDict {
@@ -102,6 +102,12 @@ void throwError(int errNum, char *errStr, int errA, int errB){
 		break;
 	case NO_EQUALS:
 		fprintf(stderr, "ERROR: expected equals '=' assignment operator.  Found '%c'.\n", *errStr);
+		break;
+	case NO_FI:
+		fprintf(stderr, "ERROR: 'if' block without closing 'fi' statement.\n");
+		break;
+	case NO_OUT:
+		fprintf(stderr, "ERROR: 'in' block without closing 'out' statement.\n");
 		break;
 	}
 	exit(errNum);
@@ -725,18 +731,20 @@ int nextIf(char *scriptLine, FILE *scriptFile, int *cursors){
 	// Finds next IF block
 	// Returns TRUE if execution should resume
 	// Returns FALSE if a further "elif" test is required
-	while (fgets(scriptLine, READ_SIZE + 1, scriptFile)){
+	while (fgets(scriptLine, READ_SIZE + 1, scriptFile) && !feof(scriptFile)){
 		cursors[STOP] = -1;
 		getNextToken(scriptLine, cursors);
 		if (substringEquals("elif", scriptLine, cursors)) return FALSE;
 		else if (substringEquals("fi", scriptLine, cursors)) return TRUE;
 		else if (substringEquals("else", scriptLine, cursors)) return TRUE;
 	}
+	throwError(NO_FI, NULL, -1, -1);
 }
 
 void endLoop(char *scriptLine, FILE *scriptFile){
 	for (int loopCount=1; loopCount; ){
 		fgets(scriptLine, READ_SIZE + 1, scriptFile);
+		if (feof(scriptFile)) throwError(NO_OUT, NULL, -1, -1);
 		int cursors[2] = {-1, -1};
 		getNextToken(scriptLine, cursors);
 		if (substringEquals("in", scriptLine, cursors)) ++loopCount;
