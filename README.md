@@ -89,7 +89,7 @@ Output:
 >>> hello
 ```
 
-Variable declaration is carried out from left to right, making the follow example valid.
+Variable declaration is carried out from left to right, making the following example valid.
 
 ```
 var foo = "hello", bar = foo
@@ -197,7 +197,7 @@ The example below would create a `file` segment variable called `myFile`, then o
 file myFile("example.txt", ".")
 ```
 
-The delimiter is optional.  If no delimiter is provided (`file newFile("example.txt")`), a newline delimiter is used by default.  If an empty delimiter is provided (`file another("example.txt", "")`), the file is parsed character-by-character.
+The delimiter is optional.  If no delimiter is provided (`file newFile("example.txt")`), a newline delimiter is used by default.  If an empty delimiter is provided (`file another("example.txt", "")`), the file is parsed character-by-character.  If the delimiter does not occur in the file, the entire file is loaded into memory.
 
 Redefining a `file` segment with the same name is allowed.  The new filename and delimiter will be updated and used from thereon.  Providing the same filename in the redefinition is the equivalent of reopening the file and rescanning from the beginning.
 
@@ -244,14 +244,14 @@ The 0<sup>th</sup> index scans from the beginning of the stream to the first occ
 A *crucial* difference between `file` and `field` segments is that `field` segments simply refer to coordinates in a `file` segment, whereas `file` segments load directly from disk, sequentially.  This traversal occurs in a forward direction only.  Therefore two calls to `print file[0]` will print different results because _"the next line"_ moves forward with each call.  This does not occur with `field` segments. 
 
 ```
-file thisFile("example.txt")
-print thisFile[1] "\n" thisFile[0] "\n"
-```
-```
 Input File:
 this is the first line
 this is the second line
 this is the third line
+```
+```
+file thisFile("example.txt")
+print thisFile[1] "\n" thisFile[0] "\n"
 ```
 ```
 Output:
@@ -275,7 +275,7 @@ Output:
 
 ### Buffers & Loops: `in`
 
-The `in` command provides a lot of functionality to `Grain`.  It can be used to define a buffer and also initiate a loop.  Our segments must be found _in_ something, right?  Lines must be _in_ a file, columns must be _in_ a line, dates must be _in_ a column.  So `in` defines the buffer on which our future commands will be executed.  The below example will print the fourth column from each line in the file.  No `file` or `field` delimiters are provided so the default newline and whitespace delimiters are used, respectively.  
+The `in` command provides a lot of functionality to `Grain`.  It can be used to define a buffer and also initiate a loop.  Our segments must be found _in_ something, right?  Lines must be _in_ a file, columns must be _in_ a line, dates must be _in_ a column.  So `in` defines the buffer on which our future commands will be executed.  The below example will print the fourth column from each line in the file.  
 
 ```
 file text("example.txt")
@@ -311,6 +311,11 @@ out
 Both loops in the above example have equivalent functionality.  If a `date` segment occured in every column, then the user could have removed the index to iterate through all columns.  Indexed and non-indexed segments can be used in any order, as shown below.  Using the `print` command with the asterisk `*` symbol outputs the entirety of the buffer defined by the current loop.  The following example prints a line count adjacent to each slash-delimited section of a `date` from the fourth `column` from each line of `text`.
 
 ```
+Input file:
+John Smith 06/11/29
+Caitlin Maurice 22/04/04
+```
+```
 file text("example.txt")
 field column()
 field date("/")
@@ -321,11 +326,6 @@ in text.column[3].date
 	lineCount += 1
 	print * " " lineCount "\n"
 out
-```
-```
-Input file:
-John Smith 06/11/29
-Caitlin Maurice 22/04/04
 ```
 ```
 Output:
