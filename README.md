@@ -23,7 +23,7 @@ John		Smith		06/11/1982
 
 ### Output: `print`
 
-Items following a `print` command will be output to the console.  This includes strings, numbers, variable values and segments - the latter of which are described below.  Valid strings are surrounded by matching double quotes `"`, single quotes `'` or backticks \`.  Within this outer pair of quotes, quote characters of the other two types can be freely used.  Spurious quotation marks can be escaped with a backslash `\` if necessary.
+Items following a `print` command will be output to the console.  This includes strings, numbers, variable values and iterators - the latter of which are described below.  Valid strings are surrounded by matching double quotes `"`, single quotes `'` or backticks \`.  Within this outer pair of quotes, quote characters of the other two types can be freely used.  Spurious quotation marks can be escaped with a backslash `\` if necessary.
 
 Escape sequences (such as tab `\t` and `\n` characters) are automatically converted.  The `print` command does *not* append a newline by default.  Multiple adjacent items separated by whitespace can be printed in one command.
 
@@ -177,35 +177,35 @@ Output:
 >>> 11
 ```
 
-Stream segments can also be included in maths mode and string mode variable assignments (below).
+Iterators can also be included in maths mode and string mode variable assignments (below).
 
-### Stream Segments
+### Stream Iterators
 
-A stream refers to text being scanned.  A segment refers to a portion of that stream.  Files are often parsed line-by-line; a line is therefore an example of a segment.  Lines are often scanned column-by-column; a column is another example of a segment.  `Grain` has `file` and `field` segments.
+Files are often parsed line-by-line; a line is therefore an example of an iterator.  Lines are often scanned column-by-column; a column is another example of an iterator.  `Grain` has `file` and `field` iterators.
 
-Segments may initially be difficult to understand but should become far more intuitive once learning about the `in` command later.
+Understanding these iterators will become more intuitive upon lewarning about the `in` command later.
 
-#### File Segments
+#### File Iterators
 
-File declarators provide a filename and a field delimiter.  The given filename is automatically opened and can be parsed in your script.  `Grain` permits parsing of multiple files in one script.
+A filename and optional delimiter are provided when declaring a file iterator.  The given filename is automatically opened and can be parsed in your script.  `Grain` permits parsing of multiple files in one script.
 
 The delimiter defines the basic segment into which a file should be parsed.  For example, files are usually parsed line-by-line, so the newline `\n` character is the delimiter in this example.
 
-The example below would create a `file` segment variable called `myFile`, then open "example.txt" and loading would occur up to period `.` characters, which effectively parses the file sentence-by-sentence.
+The example below would create a `file` iterator called `myFile`, then open "example.txt" and loading would occur up to period `.` characters, which effectively parses the file sentence-by-sentence.
 
 ```
 file myFile("example.txt", ".")
 ```
 
-The delimiter is optional.  If no delimiter is provided (`file newFile("example.txt")`), a newline delimiter is used by default.  If an empty delimiter is provided (`file another("example.txt", "")`), the file is parsed character-by-character.  If the delimiter does not occur in the file, the entire file is loaded into memory.
+The delimiter is optional.  If no delimiter is provided (`file newFile("example.txt")`), a newline delimiter is used by default.  If an empty delimiter is provided (`file another("example.txt", "")`), the file is parsed character-by-character.  If the given delimiter does not occur in the file, the entire file is loaded into memory.  Moreover, providing the special asterisk `*` character as the delimiter will also load the entire file into memory.
 
-Redefining a `file` segment with the same name is allowed.  The new filename and delimiter will be updated and used from thereon.  Providing the same filename in the redefinition is the equivalent of reopening the file and rescanning from the beginning.
+Redefining a `file` iterator with the same name is allowed.  The new filename and delimiter will be updated and used from thereon.  Providing the same filename in this redefinition is the equivalent of reopening the file and rescanning from the beginning.
 
-#### Field Segments
+#### Field Iterators
 
-Field declarators provide a delimiter with which to parse a stream.  This stream could be defined by another field segment or directly by a file segment.  At least one file segment must be present to use a field segment (otherwise there is no text to parse).
+Declaring a field iterator provides a delimiter with which to parse a text stream.  This stream could be defined by another "parent" field iterator or directly by a file iterator.  At least one file iterator must be present to use a field iterator (otherwise there is no text to parse).
 
-The example below declares a field segment variable that breaks a stream at forward slashes.
+The example below declares a field iterator variable that breaks a stream at forward slashes.
 
 ```
 field separator("/")
@@ -213,7 +213,7 @@ field separator("/")
 
 If no delimiter is provided (`field second()`) then whitespace is used as the delimiter.  Whitespace is defined as a series of one or more spaces, tabs or newline characters.  If an empty delimiter is provided (`field letters("")`) then each character is treated individually.
 
-Redefining a `field` segment with the same name is allowed.  The provided delimiter will be updated and used from thereon.
+Redefining a `field` iterator with the same name is allowed.  The provided delimiter will be updated and used from thereon.
 
 #### Delimiters
 
@@ -228,7 +228,7 @@ field segment("-")
 
 ### Index Offsets
 
-A particular occurence of a segment can be specified with an index offset, as shown below.  
+A particular occurence of an iterator can be specified with an index offset, as shown below.  
 
 ``` 
 file input("example.txt")
@@ -239,9 +239,9 @@ Offsets must be integers.  A variable name can be provided if it represents an i
 
 Offsets are 0-indexed, thus the above example will print the _second_ line from the given file.  It could be thought of as _"Print one after the next line"_ and so `print input[0]` would print the next line.
 
-The 0<sup>th</sup> index scans from the beginning of the stream to the first occurence of the delimiter _or_ the end of the stream, whichever occurs first.  This means `segment[0]` should always exist for all defined segments, even if the delimiter does not occur in the stream.  The delimiter itself is *not* included in the buffer stream.
+The 0<sup>th</sup> index scans from the beginning of the stream to the first occurence of the delimiter _or_ the end of the stream, whichever occurs first.  This means `segment[0]` should always exist for all defined iterators, even if the delimiter does not occur in the stream.  The delimiter itself is *not* included in the buffer stream.
 
-A *crucial* difference between `file` and `field` segments is that `field` segments simply refer to coordinates in a `file` segment, whereas `file` segments load directly from disk, sequentially.  This traversal occurs in a forward direction only.  Therefore two calls to `print file[0]` will print different results because _"the next line"_ moves forward with each call.  This does not occur with `field` segments. 
+A *crucial* difference between `file` and `field` iterators is that `field` iterators simply refer to coordinates in a `file` iterator, whereas `file` iterators load directly from disk, sequentially.  This traversal occurs in a forward direction only.  Therefore two calls to `print file[0]` will print different results because _"the next line"_ moves forward with each call.  This does not occur with `field` iterators. 
 
 ```
 Input File:
@@ -259,7 +259,7 @@ Output:
 >>> this is the third line
 ```
 
-As mentioned, redefining a `file` segment with the same filename will reopen the file, thus the example above becomes:  
+As mentioned, redefining a `file` iterator with the same filename will reopen the file, thus the example above becomes:  
 
 ```
 file thisFile("example.txt")
@@ -275,7 +275,7 @@ Output:
 
 ### Buffers & Loops: `in`
 
-The `in` command provides a lot of functionality to `Grain`.  It can be used to define a buffer and also initiate a loop.  Our segments must be found _in_ something, right?  Lines must be _in_ a file, columns must be _in_ a line, dates must be _in_ a column.  So `in` defines the buffer on which our future commands will be executed.  The below example will print the fourth column from each line in the file.  
+The `in` command provides a lot of functionality to `Grain`.  It can be used to define a buffer and also initiate a loop.  Our iterators must be found _in_ something, right?  Lines must be _in_ a file, columns must be _in_ a line, dates must be _in_ a column.  So `in` defines the buffer on which our future commands will be executed.  The below example will print the fourth column from each line in the file.  
 
 ```
 file text("example.txt")
@@ -286,11 +286,11 @@ in text
 out
 ```
 
-Both `file` and `field` segments are valid for use with the `in` command.  Particular segments can be specified with index offsets.  However using segments without an index will instantiate a loop over all occurences.  The `in` command is the _only_ place in `Grain` where segments can be used in the absence of an index like this.
+Both `file` and `field` iterators are valid for use with the `in` command.  Particular segments can be specified with index offsets.  However iterators without an index will instantiate a loop over all occurences.  The `in` command is the _only_ place in `Grain` where iterators can be used in the absence of an index like this.
 
 The `out` syntax defines the end of a loop.  Indentation is *not* mandatory in `Grain` but is shown here for clarity.
 
-Nested loops are permitted.  Alternatively, multiple segments can be chained together with the dot `.` syntax.  They are set up in a parent-child hierarchy.
+Nested loops are permitted.  Alternatively, multiple iterators can be chained together with the dot `.` syntax.  They are set up in a parent-child hierarchy.
 
 ```
 file text("example.txt")
@@ -308,7 +308,7 @@ in text.column[3]
 out
 ```
 
-Both loops in the above example have equivalent functionality.  If a `date` segment occured in every column, then the user could have removed the index to iterate through all columns.  Indexed and non-indexed segments can be used in any order, as shown below.  Using the `print` command with the dollar `$` symbol outputs the iterator defined by the current loop.  The following example prints a line count adjacent to each slash-delimited section of a `date` from the fourth `column` from each line of `text`.
+Both loops in the above example have equivalent functionality.  If a `date` segment occured in every column, then the user could have removed the index to iterate through all columns.  Indexed and non-indexed iteraotrs can be used in any order, as shown below.  Using the `print` command with the dollar `$` symbol outputs the iterator defined by the current loop.  The following example prints a line count adjacent to each slash-delimited section of a `date` from the fourth `column` from each line of `text`.
 
 ```
 Input file:
@@ -343,7 +343,7 @@ The `cont` (continue) command causes the program to immediately begin executing 
 
 ### Conditional Statements: `if`, `elif`, `else` and `fi`
 
-Valid comparators include variable values, strings, `file` segments, `field` segments and numbers.
+Valid comparators include variable values, strings, `file` iterators, `field` iterators and numbers.
 
 If both comparators can be converted to numbers, they will be treated as numbers, otherwise both comparators will be treated as text.
 
@@ -379,7 +379,7 @@ Output:
 
 ### Scope of Variables & Segments
 
-`Grain` implements _no_ scoping.  All variables and segments are globally accessible throughout the script from when they are defined.  
+`Grain` implements _no_ scoping.  All variables and iterators are globally accessible throughout the script from when they are defined.  
 
 In the case of redefinition, the most recent definition is used.  Even if redefinition occurs within an `in` loop or `if` block, the updated values will persist once outside of that block or loop.
 
@@ -387,14 +387,14 @@ In the case of redefinition, the most recent definition is used.  Even if redefi
 
 ### Direct Stream Editing
 
-A segment can be copied into a variable and modified then printed.
+An iterator can be copied into a variable and modified then printed.
 
 ```
 var variable = column[2]
 variable += 7
 ```
 
-It would be good to directly modify segments and print them inline with the rest of the stream.
+It would be good to directly modify iterators and print them inline with the rest of the stream.
 
 ```
 column[2] += 7

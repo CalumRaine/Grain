@@ -4,10 +4,10 @@
 #define READ_SIZE 500
 enum position	{START, STOP};
 enum boolean	{FALSE, TRUE};
-enum segment 	{FILE_SEG = 0, FIELD_SEG = 1, VAR = 2};
+enum iterators 	{FILE_ITER = 0, FIELD_ITER = 1, VAR = 2};
 enum comparator {LE = 0, LT = 1, GE = 2, GT = 3, EQ = 4, NE = 5};
 enum null 	{NOT_FOUND = -1, NO_INDEX = -1, NO_LOOP = -1, STRING = -1};
-enum errors 	{OOR, NO_DOLLAR, NO_BUFFER, NO_FILE_SEG, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS, ESC_SEQ, NO_EQUALS, NO_FI, NO_OUT};
+enum errors 	{OOR, NO_DOLLAR, NO_BUFFER, NO_FILE_ITER, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS, ESC_SEQ, NO_EQUALS, NO_FI, NO_OUT};
 enum tokenType 	{TERMINATOR = 6, QUOTE = 7, VARIABLE = 8, COMMA = 9, ASSIGNMENT = 10, DOLLAR = 11, MATHS = 12, NUMBER = 13}; 
 
 struct fileDict {
@@ -20,7 +20,7 @@ struct fileDict {
 struct fileStruct {
 	int count;
 	struct fileDict *dict;
-} fileSegs;
+} files;
 
 struct varDict {
 	char *key;
@@ -41,13 +41,13 @@ struct fieldDict {
 struct fieldStruct {
 	int count;
 	struct fieldDict *dict;
-} fieldSegs;
+} fields;
 
 struct loopStruct {
 	int type; 	// 0 = file  ; 1 = field
 	int isLoop;	// 0 = false ; 1 = true
 	int addr;	// address offet to find relevant file/field struct
-	int index;	// occurence of file/field segment to locate
+	int index;	// occurence of file/field iterator to locate
 	int chain;	// 0 =  false; 1 = true
 	long cmd; 	// fseek to start of loop in script
 	char *buff;
@@ -65,7 +65,7 @@ void throwError(int errNum, char *errStr, int errA, int errB){
 	// errA and errB are used to pass integers, they could be represent types or substring coordinates.  Set to -1 if unused.
 	switch(errNum){
 	case OOR:
-		fprintf(stderr, "ERROR: %s segment '%s[%i]' is out of range.\n", errB == FIELD_SEG ? "field" : "file", errStr, errA);
+		fprintf(stderr, "ERROR: %s iterator '%s[%i]' is out of range.\n", errB == FIELD_ITER ? "field" : "file", errStr, errA);
 		break;
 	case NO_DOLLAR:
 		fprintf(stderr, "ERROR: expected dollar '$'.  Found '%c'.\n", *errStr);
@@ -73,9 +73,9 @@ void throwError(int errNum, char *errStr, int errA, int errB){
 	case NO_BUFFER:
 		fprintf(stderr, "ERROR: no buffer set.  Asterisk '*' only relevant within an 'in' block.\n");
 		break;
-	case NO_FILE_SEG:
+	case NO_FILE_ITER:
 		if (errB != -1) errStr[errB]=0;
-		fprintf(stderr, "ERROR: field segment '%s' cannot be used without first reading into a file segment.\n", errB != -1 ? &errStr[errA] : errStr);
+		fprintf(stderr, "ERROR: field iterator '%s' cannot be used without first reading into a file iterator.\n", errB != -1 ? &errStr[errA] : errStr);
 		break;
 	case INDEX_VAR:
 		fprintf(stderr, "ERROR: variable '%s' cannot be indexed.\n", errStr);
@@ -85,17 +85,17 @@ void throwError(int errNum, char *errStr, int errA, int errB){
 		fprintf(stderr, "ERROR: '%s' does not exist.\n", &errStr[errA]);
 		break;
 	case NO_INDEX:
-		fprintf(stderr, "ERROR: %s segment '%s' requires an index in this context.\n", errB == FIELD_SEG ? "field" : "file", errStr);
+		fprintf(stderr, "ERROR: %s iterator '%s' requires an index in this context.\n", errB == FIELD_ITER ? "field" : "file", errStr);
 		break;
 	case NOT_NUM:
 		if (errB != -1) errStr[errB] = 0;
 		fprintf(stderr, "ERROR: '%s' is not a valid number.\n", errB != -1 ? &errStr[errA] : errStr);
 		break;
 	case ASSIGN:
-		fprintf(stderr, "ERROR: %s segment '%s' cannot be assigned to.\n", errA == FIELD_SEG ? "field" : "file", errStr);
+		fprintf(stderr, "ERROR: %s iterator '%s' cannot be assigned to.\n", errA == FIELD_ITER ? "field" : "file", errStr);
 		break;
 	case EXISTS:
-		fprintf(stderr, "ERROR: '%s' already exists as %s.\n", errStr, errA == FIELD_SEG ? "field segment" : (errA == FILE_SEG ? "file segment" : "variable"));
+		fprintf(stderr, "ERROR: '%s' already exists as %s.\n", errStr, errA == FIELD_ITER ? "field iterator" : (errA == FILE_ITER ? "file iterator" : "variable"));
 		break;
 	case ESC_SEQ:
 		fprintf(stderr, "ERROR: '\\%c' escape sequence not recognised.  Valid escape sequences include \\n, \\t, \\\\, \\', \\` and \\\".\n", *errStr);
@@ -286,15 +286,15 @@ int findVar(char *txt, int *cursors){
 	return NOT_FOUND;
 }
 
-int findFileSeg(char *txt, int *cursors){
+int findFileIter(char *txt, int *cursors){
 	// Returns index of file in fileDict where key matches txt substring.  Or -1
-	for (int f=0; f < fileSegs.count; ++f) if (substringEquals(fileSegs.dict[f].key, txt, cursors)) return f;
+	for (int f=0; f < files.count; ++f) if (substringEquals(files.dict[f].key, txt, cursors)) return f;
 	return NOT_FOUND;
 }
 
-int findFieldSeg(char *txt, int *cursors){
+int findFieldIter(char *txt, int *cursors){
 	// Returns index of field in fieldDict where key matches txt substring.  Or -1
-	for (int s=0; s < fieldSegs.count; ++s) if (substringEquals(fieldSegs.dict[s].key, txt, cursors)) return s;
+	for (int s=0; s < fields.count; ++s) if (substringEquals(fields.dict[s].key, txt, cursors)) return s;
 	return NOT_FOUND;
 }
 
@@ -377,7 +377,7 @@ int getNextField(char *txt, char *delimiter, int start, int stop){
 }
 
 int skipFields(char *txt, struct fieldDict *field, int index, int from, int to){
-	// Load field position after skipping "index" number of fieldSegs
+	// Load field position after skipping "index" number of fields
 	while (index-- && (from = getNextField(txt, field->val, from, to)) != -1) from = (field->val == NULL ? skipWhitespace(txt, from) : from + field->len) ;
 	return from;
 }
@@ -481,19 +481,19 @@ struct loopStack resetLoop(char *scriptLine, FILE *scriptFile){
 	// Use resetLoop on the way up the chain, use loadLoop on the way down the chain
 	
 	struct loopStruct *loop = &loops.stack[loops.ptr];
-	if (loop->type == FIELD_SEG){
-		// Load FIELD_SEG
+	if (loop->type == FIELD_ITER){
+		// Load FIELD_ITER
 		struct loopStruct *parent = &loops.stack[loops.ptr-1];
 		loop->buff = parent->buff;
 		if (loop->index == NO_INDEX) loop->start = parent->start;
-		else if ( (loop->start = skipFields(loop->buff, &fieldSegs.dict[loop->addr], loop->index, parent->start, parent->stop)) == NOT_FOUND)
-			throwError(OOR, fieldSegs.dict[loop->addr].key, loop->index, -1);
-		if ( (loop->stop = getNextField(loop->buff, fieldSegs.dict[loop->addr].val, loop->start, parent->stop)) == NOT_FOUND)
+		else if ( (loop->start = skipFields(loop->buff, &fields.dict[loop->addr], loop->index, parent->start, parent->stop)) == NOT_FOUND)
+			throwError(OOR, fields.dict[loop->addr].key, loop->index, -1);
+		if ( (loop->stop = getNextField(loop->buff, fields.dict[loop->addr].val, loop->start, parent->stop)) == NOT_FOUND)
 			loop->stop = parent->stop;
 	}
 	else {	
-		// Load FILE_SEG
-		loop->buff = loadFile(NULL, fileSegs.dict[loop->addr], &loop->stop, loop->index);
+		// Load FILE_ITER
+		loop->buff = loadFile(NULL, files.dict[loop->addr], &loop->stop, loop->index);
 		if (loop->buff == NULL) return --loops.ptr == -1 ? loops : loadLoop(scriptLine, scriptFile);
 		else loop->start = 0;
 	}
@@ -516,15 +516,15 @@ struct loopStack loadLoop(char *scriptLine, FILE *scriptFile){
 
 	if (loop->isLoop == FALSE) 
 		return --loops.ptr == -1 || loops.stack[loops.ptr].chain == FALSE ? loops : loadLoop(scriptLine, scriptFile);
-	else if (loop->type == FIELD_SEG){
-		loop->start = (fieldSegs.dict[loop->addr].val == NULL ? skipWhitespace(loop->buff, loop->stop) : loop->stop + fieldSegs.dict[loop->addr].len);
+	else if (loop->type == FIELD_ITER){
+		loop->start = (fields.dict[loop->addr].val == NULL ? skipWhitespace(loop->buff, loop->stop) : loop->stop + fields.dict[loop->addr].len);
 					       // delim != whitespace		    && delim == char-by-char	 	 && reached final char
-		if (loop->start > parent->stop || fieldSegs.dict[loop->addr].val != NULL && fieldSegs.dict[loop->addr].val[0] == 0 && loop->start == parent->stop)
+		if (loop->start > parent->stop || fields.dict[loop->addr].val != NULL && fields.dict[loop->addr].val[0] == 0 && loop->start == parent->stop)
 			return --loops.ptr == -1 || loops.stack[loops.ptr].chain == FALSE ? loops : loadLoop(scriptLine, scriptFile);
-		else if ( (loop->stop = getNextField(loop->buff, fieldSegs.dict[loop->addr].val, loop->start, parent->stop)) == NOT_FOUND)
+		else if ( (loop->stop = getNextField(loop->buff, fields.dict[loop->addr].val, loop->start, parent->stop)) == NOT_FOUND)
 			loop->stop = parent->stop;
 	}
-	else if ( (loop->buff = loadFile(loop->buff, fileSegs.dict[loop->addr], &loop->stop, 0)) == NULL)
+	else if ( (loop->buff = loadFile(loop->buff, files.dict[loop->addr], &loop->stop, 0)) == NULL)
 		return --loops.ptr == -1 || loops.stack[loops.ptr].chain == FALSE ? loops : loadLoop(scriptLine, scriptFile);
 	
 	if (loop->chain == TRUE){
@@ -539,7 +539,7 @@ struct loopStack loadLoop(char *scriptLine, FILE *scriptFile){
 
 int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 	// Converts next token to value.  Gets token from inTxt[start-stop].  Returns string in outTxt[start-stop]
-	// Token could refer to a variable, file segment, field segment.  Could be a number or string quote.
+	// Token could refer to a variable, file iterator or field iterator.  Could be a number or string quote.
 	// If substring, puts start/stop in outCurs.  Else string, puts STRING (-1) in outCurs[START]
 	// If memory allocated for string, returns TRUE.  Else returns FALSE.
 	// If no token, returns TERMINATOR (-1)
@@ -551,7 +551,7 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 		if (inTxt[inCurs[START]] != '$') throwError(NO_DOLLAR, &inTxt[inCurs[START]], -1, -1);
 		else if (loops.ptr == NO_LOOP) throwError(NO_BUFFER, NULL, -1, -1);
 		*outTxt = loops.stack[loops.ptr].buff;
-		if (loops.stack[loops.ptr].type == FIELD_SEG){
+		if (loops.stack[loops.ptr].type == FIELD_ITER){
 			outCurs[START] = loops.stack[loops.ptr].start;
 			outCurs[STOP] = loops.stack[loops.ptr].stop;
 		}
@@ -564,22 +564,22 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 		*outTxt = inTxt;
 		return FALSE;
 	case VARIABLE:
-		if (inTxt[inCurs[STOP]] == '['){ 											// Segment
-			if ((addr = findFieldSeg(inTxt, inCurs)) != NOT_FOUND) { 							// Field segment
-				if (loops.ptr == NO_LOOP) throwError(NO_FILE_SEG, fieldSegs.dict[addr].key, -1, -1);
+		if (inTxt[inCurs[STOP]] == '['){ 											// Iterator
+			if ((addr = findFieldIter(inTxt, inCurs)) != NOT_FOUND) { 							// Field iterator
+				if (loops.ptr == NO_LOOP) throwError(NO_FILE_ITER, fields.dict[addr].key, -1, -1);
 				getNextToken(inTxt, inCurs);
 				struct loopStruct *loop = &loops.stack[loops.ptr];
-				outCurs[START] = skipFields(loop->buff, &fieldSegs.dict[addr], (int)token2Num(inTxt, inCurs), loop->start, loop->stop);
-				if (outCurs[START] == NOT_FOUND) throwError(OOR, fieldSegs.dict[addr].key, (int)token2Num(inTxt, inCurs), FIELD_SEG);
-				outCurs[STOP] = getNextField(loop->buff, fieldSegs.dict[addr].val, outCurs[START], loop->stop);
+				outCurs[START] = skipFields(loop->buff, &fields.dict[addr], (int)token2Num(inTxt, inCurs), loop->start, loop->stop);
+				if (outCurs[START] == NOT_FOUND) throwError(OOR, fields.dict[addr].key, (int)token2Num(inTxt, inCurs), FIELD_ITER);
+				outCurs[STOP] = getNextField(loop->buff, fields.dict[addr].val, outCurs[START], loop->stop);
 				if (outCurs[STOP] == NOT_FOUND) outCurs[STOP] = loop->stop;
 				*outTxt = loops.stack[loops.ptr].buff;
 				return FALSE;
 			}
-			else if ((addr = findFileSeg(inTxt, inCurs)) != NOT_FOUND){							// File segment
+			else if ((addr = findFileIter(inTxt, inCurs)) != NOT_FOUND){							// File iterator
 				getNextToken(inTxt, inCurs);
 				outCurs[START] = STRING;
-				*outTxt = loadFile(NULL, fileSegs.dict[addr], &addr, (int)token2Num(inTxt, inCurs));
+				*outTxt = loadFile(NULL, files.dict[addr], &addr, (int)token2Num(inTxt, inCurs));
 				return TRUE;
 			}
 			else if ((addr = findVar(inTxt, inCurs)) != NOT_FOUND) throwError(INDEX_VAR, vars.dict[addr].key, -1, -1);	// Var error
@@ -590,8 +590,8 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 			*outTxt = vars.dict[addr].val;
 			return FALSE;
 		}
-		else if ((addr=findFieldSeg(inTxt, inCurs)) != NOT_FOUND ) throwError(NO_INDEX, fieldSegs.dict[addr].key, FIELD_SEG, -1);
-		else if ((addr=findFileSeg(inTxt, inCurs)) != NOT_FOUND) throwError(NO_INDEX, fileSegs.dict[addr].key, FILE_SEG, -1);
+		else if ((addr=findFieldIter(inTxt, inCurs)) != NOT_FOUND ) throwError(NO_INDEX, fields.dict[addr].key, FIELD_ITER, -1);
+		else if ((addr=findFileIter(inTxt, inCurs)) != NOT_FOUND) throwError(NO_INDEX, files.dict[addr].key, FILE_ITER, -1);
 		else throwError(NOT_EXIST, inTxt, inCurs[START], inCurs[STOP]);								// Unknown error
 	case COMMA:
 	case TERMINATOR:
@@ -757,8 +757,8 @@ void endLoop(char *scriptLine, FILE *scriptFile){
 
 int main(int argc, char **argv){
 	vars.count = 0, vars.dict = NULL;
-	fieldSegs.count = 0, fieldSegs.dict = NULL;
-	fileSegs.count = 0, fileSegs.dict = NULL;
+	fields.count = 0, fields.dict = NULL;
+	files.count = 0, files.dict = NULL;
 	loops.ptr = -1, loops.cap = 0, loops.stack = NULL;
 	char scriptLine[READ_SIZE + 1];
 	FILE *scriptFile = fopen(argv[1], "r");
@@ -769,8 +769,8 @@ int main(int argc, char **argv){
 			do {
 				getNextToken(scriptLine, cursors);
 				int addr;
-				if ((addr = findFieldSeg(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, fieldSegs.dict[addr].key, FIELD_SEG, -1);
-				else if ((addr = findFileSeg(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, fileSegs.dict[addr].key, FILE_SEG, -1);
+				if ((addr = findFieldIter(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, fields.dict[addr].key, FIELD_ITER, -1);
+				else if ((addr = findFileIter(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, files.dict[addr].key, FILE_ITER, -1);
 				else if ((addr = findVar(scriptLine, cursors)) == NOT_FOUND){
 					// Allocate new variable
 					addr = vars.count++;
@@ -836,20 +836,20 @@ int main(int argc, char **argv){
 
 			int addr;
 			if ((addr = findVar(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, vars.dict[addr].key, VAR, -1);
-			else if ((addr = findFieldSeg(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, fieldSegs.dict[addr].key, FIELD_SEG, -1);
-			else if ((addr = findFileSeg(scriptLine, cursors)) == NOT_FOUND){
-				// Allocate new file segment
-				addr = fileSegs.count++;
-				fileSegs.dict = realloc(fileSegs.dict, fileSegs.count * sizeof(struct fileDict));
-				fileSegs.dict[addr].key = substringSave(NULL, scriptLine, cursors);
+			else if ((addr = findFieldIter(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, fields.dict[addr].key, FIELD_ITER, -1);
+			else if ((addr = findFileIter(scriptLine, cursors)) == NOT_FOUND){
+				// Allocate new file iterator
+				addr = files.count++;
+				files.dict = realloc(files.dict, files.count * sizeof(struct fileDict));
+				files.dict[addr].key = substringSave(NULL, scriptLine, cursors);
 			}
 			else {
-				// Clear/Close this file segment
-				free(fileSegs.dict[addr].delimiter);
-				fclose(fileSegs.dict[addr].fp);
+				// Clear/Close this file iterator
+				free(files.dict[addr].delimiter);
+				fclose(files.dict[addr].fp);
 			}
 
-			struct fileDict *file = &fileSegs.dict[addr];
+			struct fileDict *file = &files.dict[addr];
 
 			// Get filename
 			if (getNextToken(scriptLine, cursors) == QUOTE) {
@@ -883,15 +883,15 @@ int main(int argc, char **argv){
 			getNextToken(scriptLine, cursors);
 			int addr;
 			if ((addr = findVar(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, vars.dict[addr].key, VAR, -1);
-			else if ((addr = findFileSeg(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, fileSegs.dict[addr].key, FILE_SEG, -1);
-			else if ((addr=findFieldSeg(scriptLine, cursors)) == NOT_FOUND){
-				addr = fieldSegs.count++;
-				fieldSegs.dict = realloc(fieldSegs.dict, fieldSegs.count * sizeof(struct fieldDict));
-				fieldSegs.dict[addr].key = substringSave(NULL, scriptLine, cursors);
+			else if ((addr = findFileIter(scriptLine, cursors)) != NOT_FOUND) throwError(EXISTS, files.dict[addr].key, FILE_ITER, -1);
+			else if ((addr=findFieldIter(scriptLine, cursors)) == NOT_FOUND){
+				addr = fields.count++;
+				fields.dict = realloc(fields.dict, fields.count * sizeof(struct fieldDict));
+				fields.dict[addr].key = substringSave(NULL, scriptLine, cursors);
 			}
-			else free(fieldSegs.dict[addr].val);
+			else free(fields.dict[addr].val);
 
-			struct fieldDict *field = &fieldSegs.dict[addr];
+			struct fieldDict *field = &fields.dict[addr];
 
 			// Get delimiter
 			if (getNextToken(scriptLine, cursors) == QUOTE) {
@@ -921,10 +921,10 @@ int main(int argc, char **argv){
 
 				// Get type and addr
 				getNextToken(scriptLine, cursors);
-				loop->addr = findFileSeg(scriptLine, cursors);
+				loop->addr = findFileIter(scriptLine, cursors);
 				if ( loop->type = (loop->addr == NOT_FOUND) ) {
-					if (!loops.ptr) throwError(NO_FILE_SEG, scriptLine, cursors[START], cursors[STOP]);
-					loop->addr = findFieldSeg(scriptLine, cursors);
+					if (!loops.ptr) throwError(NO_FILE_ITER, scriptLine, cursors[START], cursors[STOP]);
+					loop->addr = findFieldIter(scriptLine, cursors);
 				}
 
 				// Get index
@@ -935,7 +935,7 @@ int main(int argc, char **argv){
 				}
 				else {
 					loop->isLoop = TRUE;
-					loop->index = loop->type == FIELD_SEG? -1 : 0;
+					loop->index = loop->type == FIELD_ITER? -1 : 0;
 				}
 
 				loop->chain = FALSE; 
@@ -960,7 +960,7 @@ int main(int argc, char **argv){
 		}
 		else if (substringEquals("break", scriptLine, cursors)){
 			do {
-				if (loops.stack[loops.ptr].type == FILE_SEG) free(loops.stack[loops.ptr].buff);
+				if (loops.stack[loops.ptr].type == FILE_ITER) free(loops.stack[loops.ptr].buff);
 			} while ( --loops.ptr >= 0 && loops.stack[loops.ptr].chain == TRUE);
 
 			endLoop(scriptLine, scriptFile);
@@ -972,8 +972,8 @@ int main(int argc, char **argv){
 			int destAddr = findVar(scriptLine, cursors);
 			if (destAddr == NOT_FOUND){
 				int err;
-				if ((err=findFieldSeg(scriptLine, cursors)) != NOT_FOUND) throwError(ASSIGN, fieldSegs.dict[err].key, FIELD_SEG, -1);
-				else if ((err=findFileSeg(scriptLine, cursors)) != NOT_FOUND) throwError(ASSIGN, fileSegs.dict[err].key, FILE_SEG, -1);
+				if ((err=findFieldIter(scriptLine, cursors)) != NOT_FOUND) throwError(ASSIGN, fields.dict[err].key, FIELD_ITER, -1);
+				else if ((err=findFileIter(scriptLine, cursors)) != NOT_FOUND) throwError(ASSIGN, files.dict[err].key, FILE_ITER, -1);
 				else throwError(NOT_EXIST, scriptLine, cursors[START], cursors[STOP]);
 			}
 
@@ -991,20 +991,20 @@ int main(int argc, char **argv){
 	fclose(scriptFile);
 
 	// Free loop buffers
-	for ( ; loops.ptr > -1; --loops.ptr) if (loops.stack[loops.ptr].type == FILE_SEG) free(loops.stack[loops.ptr].buff);
+	for ( ; loops.ptr > -1; --loops.ptr) if (loops.stack[loops.ptr].type == FILE_ITER) free(loops.stack[loops.ptr].buff);
 	if (loops.stack != NULL) free(loops.stack);
 
 	// Free variables
 	for (int var=0; var < vars.count; ++var) free(vars.dict[var].key), free(vars.dict[var].val);
 	if (vars.dict != NULL) free(vars.dict);
 
-	// Free file segments
-	for (int file=0; file < fileSegs.count; ++file) free(fileSegs.dict[file].key), free(fileSegs.dict[file].delimiter), fclose(fileSegs.dict[file].fp);
-	if (fileSegs.dict != NULL) free(fileSegs.dict);
+	// Free file iterators
+	for (int file=0; file < files.count; ++file) free(files.dict[file].key), free(files.dict[file].delimiter), fclose(files.dict[file].fp);
+	if (files.dict != NULL) free(files.dict);
 
-	// Free field segments
-	for (int field=0; field < fieldSegs.count; ++field) free(fieldSegs.dict[field].key), free(fieldSegs.dict[field].val);
-	if (fieldSegs.dict != NULL) free(fieldSegs.dict);
+	// Free field iterators
+	for (int field=0; field < fields.count; ++field) free(fields.dict[field].key), free(fields.dict[field].val);
+	if (fields.dict != NULL) free(fields.dict);
 
 	return 0;
 }
