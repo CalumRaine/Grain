@@ -7,8 +7,8 @@ enum boolean	{FALSE, TRUE};
 enum segment 	{FILE_SEG = 0, FIELD_SEG = 1, VAR = 2};
 enum comparator {LE = 0, LT = 1, GE = 2, GT = 3, EQ = 4, NE = 5};
 enum null 	{NOT_FOUND = -1, NO_INDEX = -1, NO_LOOP = -1, STRING = -1};
-enum errors 	{OOR, NO_ASTERISK, NO_BUFFER, NO_FILE_SEG, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS, ESC_SEQ, NO_EQUALS, NO_FI, NO_OUT};
-enum tokenType 	{TERMINATOR = 6, QUOTE = 7, VARIABLE = 8, COMMA = 9, ASSIGNMENT = 10, ASTERISK = 11, MATHS = 11, NUMBER = 12}; 
+enum errors 	{OOR, NO_DOLLAR, NO_BUFFER, NO_FILE_SEG, INDEX_VAR, NOT_EXIST, NOT_NUM, ASSIGN, EXISTS, ESC_SEQ, NO_EQUALS, NO_FI, NO_OUT};
+enum tokenType 	{TERMINATOR = 6, QUOTE = 7, VARIABLE = 8, COMMA = 9, ASSIGNMENT = 10, DOLLAR = 11, MATHS = 12, NUMBER = 13}; 
 
 struct fileDict {
 	char *key; 		// filename
@@ -67,8 +67,8 @@ void throwError(int errNum, char *errStr, int errA, int errB){
 	case OOR:
 		fprintf(stderr, "ERROR: %s segment '%s[%i]' is out of range.\n", errB == FIELD_SEG ? "field" : "file", errStr, errA);
 		break;
-	case NO_ASTERISK:
-		fprintf(stderr, "ERROR: exepcted asterisk '*'.  Found '%c'.\n", *errStr);
+	case NO_DOLLAR:
+		fprintf(stderr, "ERROR: expected dollar '$'.  Found '%c'.\n", *errStr);
 		break;
 	case NO_BUFFER:
 		fprintf(stderr, "ERROR: no buffer set.  Asterisk '*' only relevant within an 'in' block.\n");
@@ -132,6 +132,9 @@ int getNextToken(char *txt, int *cursors){
 	case ',':
 		cursors[STOP] = cursors[START];
 		return COMMA;
+	case '$':
+		cursors[STOP] = cursors[START];
+		return DOLLAR;
 	case '=':
 		if (txt[cursors[START]+1] == '='){
 			cursors[STOP] = cursors[START]+1;
@@ -543,9 +546,9 @@ int retrieveToken(int *outCurs, char **outTxt, char *inTxt, int *inCurs){
 
 	int addr;
 	switch (getNextToken(inTxt, inCurs)){
-	case ASTERISK:
-		// User provided asterisk (*), which means "entire buffer"
-		if (inTxt[inCurs[START]] != '*') throwError(NO_ASTERISK, &inTxt[inCurs[START]], -1, -1);
+	case DOLLAR:
+		// User provided dollar ($), which means "entire buffer"
+		if (inTxt[inCurs[START]] != '$') throwError(NO_DOLLAR, &inTxt[inCurs[START]], -1, -1);
 		else if (loops.ptr == NO_LOOP) throwError(NO_BUFFER, NULL, -1, -1);
 		*outTxt = loops.stack[loops.ptr].buff;
 		if (loops.stack[loops.ptr].type == FIELD_SEG){

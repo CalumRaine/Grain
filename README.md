@@ -36,7 +36,7 @@ Output:
 >>> My age is 87.
 ```
 
-The asterisk `*` is interpreted by `print` as a special character that refers to the current buffer	 (discussed later).
+The dollar `$` is interpreted by `print` as a special character that refers to the current iterator (discussed later).
 
 Floating point numbers are printed up to five decimal places; trailing zeroes are not printed.
 
@@ -308,7 +308,7 @@ in text.column[3]
 out
 ```
 
-Both loops in the above example have equivalent functionality.  If a `date` segment occured in every column, then the user could have removed the index to iterate through all columns.  Indexed and non-indexed segments can be used in any order, as shown below.  Using the `print` command with the asterisk `*` symbol outputs the entirety of the buffer defined by the current loop.  The following example prints a line count adjacent to each slash-delimited section of a `date` from the fourth `column` from each line of `text`.
+Both loops in the above example have equivalent functionality.  If a `date` segment occured in every column, then the user could have removed the index to iterate through all columns.  Indexed and non-indexed segments can be used in any order, as shown below.  Using the `print` command with the dollar `$` symbol outputs the iterator defined by the current loop.  The following example prints a line count adjacent to each slash-delimited section of a `date` from the fourth `column` from each line of `text`.
 
 ```
 Input file:
@@ -324,7 +324,7 @@ var lineCount = 0
 
 in text.column[3].date
 	lineCount += 1
-	print * " " lineCount "\n"
+	print $ " " lineCount "\n"
 out
 ```
 ```
@@ -398,7 +398,7 @@ It would be good to directly modify segments and print them inline with the rest
 
 ```
 column[2] += 7
-print *
+print $
 ```
 
 This would currently require looping through all other columns before/after `column[2]` and printing those.
