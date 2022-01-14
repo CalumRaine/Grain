@@ -36,7 +36,7 @@ Output:
 >>> My age is 87.
 ```
 
-The dollar `$` is interpreted by `print` as a special character that refers to the current iterator (discussed later).
+The dollar `$` is interpreted by `print` as a special character that refers to the current iterator (`Section 6`).
 
 Floating point numbers are printed up to five decimal places; trailing zeroes are not printed.
 
@@ -100,7 +100,7 @@ Output:
 >>> hello
 ```
 
-There are two assignment modes: string mode and maths mode.  These examples have demonstrated string mode, using the bare assignment operator.  Prepending a mathematical operator to the assignment operator initiates maths mode (shown later).  A mixture of maths mode and string mode can *not* be used within the same command.
+There are two assignment modes: string mode and maths mode.  These examples have demonstrated string mode, using the bare assignment operator.  Prepending a mathematical operator to the assignment operator initiates maths mode (`Section 3.2`).  A mixture of maths mode and string mode can *not* be used within the same command.
 
 #### 3.1 String Mode & Concatenation
 
@@ -183,7 +183,7 @@ Iterators can also be included in maths mode and string mode variable assignment
 
 Files are often parsed line-by-line; a line is therefore an example of an iterator.  Lines are often scanned column-by-column; a column is another example of an iterator.  `Grain` has `file` and `field` iterators.
 
-Understanding these iterators will become more intuitive upon learning about the `in` command later.
+Understanding these iterators will become more intuitive upon learning about the `in` command later (`Section 6`).
 
 #### 4.2) File Iterators
 
@@ -208,7 +208,7 @@ Redefining a `file` iterator with the same name is allowed.  The new filename an
 
 #### 4.3) Field Iterators
 
-A field iterator provides a delimiter with which to parse a text stream.  It is declared like a file iterator, minus the filename.  At least one file iterator must be present to use a field iterator (otherwise there is no text to parse).  The parsed stream could also be defined by another "parent" field iterator (see the `in` command for examples).  
+A field iterator provides a delimiter with which to parse a text stream.  It is declared like a file iterator, minus the filename.  At least one file iterator must be present to use a field iterator (otherwise there is no text to parse).  The parsed stream could also be defined by another "parent" field iterator (`Section 6`).  
 
 The example below declares a field iterator variable that breaks a stream at forward slashes.
 
@@ -216,7 +216,12 @@ The example below declares a field iterator variable that breaks a stream at for
 field separator("/")
 ```
 
-If no delimiter is provided (`field second()`) then whitespace is used as the delimiter.  Whitespace is defined as a series of one or more spaces, tabs or newline characters.  If an empty delimiter is provided (`field letters("")`) then each character is treated individually.
+If no delimiter is provided then whitespace is used as the delimiter.  Whitespace is defined as a series of one or more spaces, tabs or newline characters.  If an empty delimiter is provided then each character is treated individually.
+
+```
+field first() 		; No delimiter provided, whitespace used by default
+field letters("") 	; Empty delimiter provided, stream parsed character-by-character
+```
 
 Redefining a `field` iterator with the same name is allowed.  The provided delimiter will be updated and used from thereon.
 
