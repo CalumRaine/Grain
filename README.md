@@ -9,7 +9,7 @@ Forename	Surname 	Date
 John		Smith		06/11/1982
 ```
 
-`Grain` is primarily designed with this challenge in mind.  It is a personal hobby project; bugs are guaranteed and output reliability is not.  Major backward-incompatible revisions to the language should be expected.
+`Grain` is primarily designed with this challenge in mind.  It is a personal hobby project; bugs are guaranteed and reliability is not.  Major backward-incompatible revisions to the language should be expected.
 
 ## Specification
 
