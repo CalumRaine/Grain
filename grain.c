@@ -862,13 +862,22 @@ int main(int argc, char **argv){
 
 			// Get delimiter
 			if (scriptLine[cursors[STOP]] == ',' || getNextToken(scriptLine, cursors) == COMMA){
-				if (getNextToken(scriptLine, cursors) == QUOTE) {
+				switch(getNextToken(scriptLine, cursors)){
+				case QUOTE:
 					file->len = cursors[STOP] - cursors[START];
 					file->delimiter = substringSave(NULL, scriptLine, cursors);
-				}
-				else {
+					break;
+				case MATHS:
+					if (scriptLine[cursors[START]] != '*') ; // throw some kind of error
+					else ; // load entire file
+				case DOLLAR:
+					// What if they put a file segment into a file segment?
+					// retrieveToken() might be a better choice for this switch statement
+				case VARIABLE:
 					file->delimiter = stringSave(NULL, vars.dict[findVar(scriptLine, cursors)].val);
 					for (file->len = 0; file->delimiter[file->len] != 0; ++file->len);
+				default:
+					// Raise invalid token error
 				}
 			}
 			else {  // No delimiter provided.  Default = newline (\n)
